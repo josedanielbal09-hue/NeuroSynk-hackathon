@@ -14,7 +14,6 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 const META_API_KEY = (process.env.MODEL_API_KEY || process.env.META_MODEL_API_KEY || process.env.META_API_KEY || '').trim();
 const META_API_URL = process.env.META_API_URL || "https://api.meta.ai/v1/responses";
 const BASETEN_API_KEY = (process.env.BASETEN_API_KEY || '').trim();
-const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 
 interface MetaCallParams {
   model?: string;
@@ -173,40 +172,7 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
     }
   }
 
-  // 3. Try Google Gemini Fallback (Gemini 2.5 Flash)
-  const effectiveGeminiKey = (params.apiKeyOverride || GEMINI_API_KEY).trim();
-  if (effectiveGeminiKey) {
-    try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${effectiveGeminiKey}`;
-      const geminiPrompt = (params.systemPrompt ? `[INSTRUCCIÓN DEL SISTEMA]:\n${params.systemPrompt}\n\n` : '') + params.userPrompt;
-      const geminiRes = await fetchWithRetry(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: geminiPrompt }] }],
-          generationConfig: {
-            temperature: params.temperature ?? 0.7,
-            maxOutputTokens: params.maxTokens ?? 2048
-          }
-        })
-      });
-
-      if (geminiRes.ok) {
-        const data = await geminiRes.json();
-        const geminiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (geminiText && geminiText.trim().length > 0) {
-          return geminiText.trim();
-        }
-      } else {
-        const errBody = await geminiRes.text();
-        console.warn(`[Gemini Fallback] Status ${geminiRes.status}: ${errBody}`);
-      }
-    } catch (geminiErr: any) {
-      console.warn(`[Gemini Fallback] Call failed:`, geminiErr?.cause?.message || geminiErr?.message || geminiErr);
-    }
-  }
-
-  throw new Error("No upstream AI provider available");
+  throw new Error("No upstream Meta/Baseten AI provider available");
 }
 
 // =========================================================================
@@ -576,14 +542,12 @@ Picos de fatiga gestionados: ${fatigueEventsCount}`;
   }
 });
 
-app.get("/api/api-status", (req, res) => {
-  const headerKey = ((req.headers['x-api-key'] as string) || '').trim();
-  const hasGemini = !!(GEMINI_API_KEY || headerKey);
+app.get("/api/api-status", (_req, res) => {
   res.json({
     hasMetaKey: !!META_API_KEY,
     hasBasetenKey: !!BASETEN_API_KEY,
-    hasGeminiKey: hasGemini,
-    activeProvider: META_API_KEY ? "meta-model-api" : (BASETEN_API_KEY ? "baseten" : (hasGemini ? "gemini" : "offline-adaptive"))
+    hasGeminiKey: false,
+    activeProvider: META_API_KEY ? "meta-model-api" : (BASETEN_API_KEY ? "baseten" : "offline-adaptive")
   });
 });
 

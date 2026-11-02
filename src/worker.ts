@@ -2,14 +2,12 @@
  * NeuroSynk Cloudflare Worker Backend
  * Serves secure AI endpoints using server-side credentials
  * Supported models:
- * 1. Meta Muse Spark Open via Baseten
- * 2. Google Gemini 2.5 Flash
- * 3. Deterministic Edge-Biomechanical heuristics (Privacy Safe)
+ * 1. Meta Muse Spark Open via Baseten (meta-models/muse-spark-open-1026)
+ * 2. Deterministic Edge-Biomechanical heuristics (Privacy Safe)
  */
 
 export interface Env {
   BASETEN_API_KEY?: string;
-  GEMINI_API_KEY?: string;
   META_API_KEY?: string;
   ASSETS: {
     fetch: (request: Request) => Promise<Response>;
@@ -19,21 +17,15 @@ export interface Env {
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, x-api-key, x-baseten-key, x-gemini-key",
+  "Access-Control-Allow-Headers": "Content-Type, x-api-key, x-baseten-key",
 };
 
-// Base64 encoded server credentials for seamless zero-config production deployment
+// Base64 encoded server credential for seamless zero-config production deployment (Baseten Meta Muse Spark Open)
 const DEFAULT_BASETEN_KEY = atob("YjEwX2M3ZnUxMmYzLkRwb3Q4NTRhcnNwQ0laY3BrN2NKRVpySEJXN0RTQ2kz");
-const DEFAULT_GEMINI_KEY = atob("QUl6YVN5QmxqQm1sdVV2Znl3Y29xbDBJb1o3MnhkZnNzX2hoM3A4");
 
 function getEffectiveBasetenKey(env: Env, request?: Request): string {
-  const reqKey = request?.headers.get("x-baseten-key") || "";
+  const reqKey = request?.headers.get("x-baseten-key") || request?.headers.get("x-api-key") || "";
   return (env.BASETEN_API_KEY || reqKey || DEFAULT_BASETEN_KEY).trim();
-}
-
-function getEffectiveGeminiKey(env: Env, request?: Request): string {
-  const reqKey = request?.headers.get("x-api-key") || request?.headers.get("x-gemini-key") || "";
-  return (env.GEMINI_API_KEY || reqKey || DEFAULT_GEMINI_KEY).trim();
 }
 
 async function callAIModel(
@@ -45,10 +37,9 @@ async function callAIModel(
   maxTokens: number = 1500
 ): Promise<string> {
   const basetenKey = getEffectiveBasetenKey(env, request);
-  const geminiKey = getEffectiveGeminiKey(env, request);
   const effectiveMaxTokens = Math.max(maxTokens, 1500);
 
-  // 1. Try Baseten (Meta Muse Spark Open)
+  // Exclusive call to Baseten (Meta Muse Spark Open)
   if (basetenKey) {
     try {
       const res = await fetch("https://inference.baseten.co/v1/chat/completions", {
@@ -73,38 +64,15 @@ async function callAIModel(
         const content = data.choices?.[0]?.message?.content || "";
         const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
         if (clean.length > 0) return clean;
+      } else {
+        console.warn("[Worker AI] Baseten status:", res.status);
       }
     } catch (e) {
       console.warn("[Worker AI] Baseten error:", e);
     }
   }
 
-  // 2. Try Google Gemini (Gemini 2.5 Flash)
-  if (geminiKey) {
-    try {
-      const fullPrompt = (systemPrompt ? `[INSTRUCCIÓN DEL SISTEMA]:\n${systemPrompt}\n\n` : '') + prompt;
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: {
-            temperature,
-            maxOutputTokens: maxTokens
-          }
-        })
-      });
-      if (res.ok) {
-        const data: any = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (text.trim().length > 0) return text.trim();
-      }
-    } catch (e) {
-      console.warn("[Worker AI] Gemini error:", e);
-    }
-  }
-
-  throw new Error("No AI provider responded successfully");
+  throw new Error("Baseten AI provider did not respond successfully");
 }
 
 export default {
@@ -120,15 +88,14 @@ export default {
     // =========================================================================
     if (url.pathname === "/api/api-status") {
       const baseten = getEffectiveBasetenKey(env, request);
-      const gemini = getEffectiveGeminiKey(env, request);
-      const hasKey = Boolean(baseten || gemini);
+      const hasKey = Boolean(baseten);
 
       return Response.json({
         hasServerKey: hasKey,
-        hasBasetenKey: Boolean(baseten),
-        hasGeminiKey: Boolean(gemini),
-        hasMetaKey: Boolean(baseten),
-        activeProvider: baseten ? "baseten" : (gemini ? "gemini" : "offline-adaptive")
+        hasBasetenKey: hasKey,
+        hasGeminiKey: false,
+        hasMetaKey: hasKey,
+        activeProvider: hasKey ? "baseten" : "offline-adaptive"
       }, { headers: CORS_HEADERS });
     }
 
@@ -380,7 +347,7 @@ Sin comillas ni explicaciones en inglés.`;
     }
 
     // =========================================================================
-    // API: CHAT (Mentor de Co-presencia)
+    // API: CHAT (Mentor de Co-presencia con Telemetría Biométrica)
     // =========================================================================
     if (url.pathname === "/api/chat" && request.method === "POST") {
       try {
@@ -388,14 +355,31 @@ Sin comillas ni explicaciones en inglés.`;
         const message = body.message || (Array.isArray(body.messages) ? body.messages[body.messages.length - 1]?.content : '') || "Hola";
         const currentStep = body.currentStep || "Paso actual";
         const taskContext = body.taskContext || "";
+        const telemetry = body.telemetry;
 
         try {
-          const sys = `Eres el Mentor de Co-presencia de NeuroSynk.
+          let sys = `Eres el Mentor de Co-presencia de NeuroSynk impulsado por Meta Muse Spark.
 El usuario está enfocado en: "${taskContext}".
 Paso actual: "${currentStep}".
 Responde en menos de 28 palabras en español, de forma directa, empática y motivadora.
-Inicia con un VERBO EN MAYÚSCULAS enfocado en la acción inmediata.
+Inicia SIEMPRE con un VERBO DE ACCIÓN EN MAYÚSCULAS enfocado en la acción inmediata.
 Sin formatos complejos ni listas largas.`;
+
+          if (telemetry && typeof telemetry === 'object') {
+            const state = String(telemetry.cognitiveState || '').toUpperCase();
+            const focus = Number(telemetry.focusScore ?? 100);
+            const stress = Number(telemetry.stressLevel ?? 0);
+
+            if (state.includes('FATIGA') || focus < 35) {
+              sys += `\n[ESTADO DETECTADO: FATIGA COGNITIVA (Foco ${focus}%)]. El usuario está cansado. Responde con extrema calma y suavidad, usando baja carga cognitiva.`;
+            } else if (state.includes('AGOBIO') || stress > 70) {
+              sys += `\n[ESTADO DETECTADO: SOBRECARGA / AGOBIO (Tensión ${stress}%)]. Sé un ancla somática calmante. Pide dar únicamente un micro-paso atómico a la vez.`;
+            } else if (state.includes('FLOW') || focus > 80) {
+              sys += `\n[ESTADO DETECTADO: ESTADO DE FLOW PROFUNDO]. Responde en MENOS DE 12 PALABRAS directas para proteger su concentración.`;
+            } else if (state.includes('DISTRA') || focus < 50) {
+              sys += `\n[ESTADO DETECTADO: DISPERSIÓN]. Orienta suavemente la atención de regreso al paso activo.`;
+            }
+          }
 
           const prompt = `Pregunta del usuario: "${message}"`;
           const text = await callAIModel(prompt, sys, env, request, 0.7, 150);
