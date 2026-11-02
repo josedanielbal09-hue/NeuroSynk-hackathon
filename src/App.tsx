@@ -301,38 +301,11 @@ export default function App() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [isTestingKey, setIsTestingKey] = useState(false);
   const [keyTestResult, setKeyTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [apiStatus, setApiStatus] = useState<'browser' | 'server' | 'none'>(() => {
-    const isCleared = localStorage.getItem('gemini_api_key_cleared') === 'true';
-    const stored = (localStorage.getItem('gemini_api_key') || '').trim();
-    if (stored) return 'browser';
-    if (isCleared) return 'none';
-    const envKey = (typeof process !== 'undefined' && (process.env as any)?.GEMINI_API_KEY ? (process.env as any).GEMINI_API_KEY : '').trim();
-    return envKey ? 'browser' : 'none';
-  });
+  const [apiStatus, setApiStatus] = useState<'browser' | 'server' | 'none'>('server');
 
   useEffect(() => {
-    const checkApiStatus = async () => {
-      const currentKey = (geminiApiKey || localStorage.getItem('gemini_api_key') || (typeof process !== 'undefined' && (process.env as any)?.GEMINI_API_KEY ? (process.env as any).GEMINI_API_KEY : '')).trim();
-      if (currentKey) {
-        setApiStatus('browser');
-        return;
-      }
-      try {
-        const response = await fetch('/api/api-status');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.hasServerKey) {
-            setApiStatus('server');
-            return;
-          }
-        }
-      } catch (e) {
-        // En Cloudflare Workers / despliegue estático no hay servidor Express
-      }
-      setApiStatus('none');
-    };
-    checkApiStatus();
-  }, [geminiApiKey]);
+    setApiStatus('server');
+  }, []);
 
 
   // Chat States
@@ -1887,150 +1860,13 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             )}
           </div>
 
-          <div className="flex items-center gap-2 px-2.5">
-            <div className={`w-2 h-2 rounded-full ${apiStatus === 'browser' ? 'bg-green-500 animate-pulse' :
-              apiStatus === 'server' ? 'bg-blue-500 animate-pulse' : 'bg-red-500 animate-pulse'
-              }`} />
-            <span className="font-mono text-[9px] tracking-wider text-zinc-400 uppercase font-semibold">
-              {apiStatus === 'browser' ? 'Meta Muse Activo' :
-                apiStatus === 'server' ? 'Meta / Baseten Activo' : 'IA Offline'}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/80 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+            <span className="font-mono text-[9px] tracking-wider text-emerald-400 uppercase font-semibold">
+              Meta Muse Activo
             </span>
           </div>
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="p-2 hover:bg-zinc-800 hover:text-green-400 text-zinc-400 rounded-xl transition-all cursor-pointer"
-            title="Configuración de Enlace Neuronal (API Key)"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
         </div>
-
-        {/* SETTINGS MODAL */}
-        <AnimatePresence>
-          {isSettingsOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-            >
-              <motion.div
-                initial={{ scale: 0.95, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 20 }}
-                className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl max-w-sm w-full shadow-2xl flex flex-col gap-5"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
-                    <Settings className="text-green-500 w-5 h-5" />
-                  </div>
-                  <div className="flex flex-col">
-                    <h3 className="text-white font-medium text-base tracking-tight">Ajustes de Enlace</h3>
-                    <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Meta & Baseten Model API</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-mono text-zinc-400 uppercase tracking-wider">Meta / Baseten API Key:</label>
-                  <div className="relative flex items-center">
-                    <input
-                      type={showApiKey ? "text" : "password"}
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder="Pega tu clave (LLM_... o Baseten)"
-                      value={geminiApiKey}
-                      onChange={(e) => {
-                        setGeminiApiKey(e.target.value);
-                        setKeyTestResult(null);
-                      }}
-                      className="w-full px-4 py-3 pr-11 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-green-500 text-white placeholder-zinc-700 font-mono text-xs shadow-inner"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-3 text-zinc-500 hover:text-zinc-300 transition-colors p-1"
-                      title={showApiKey ? "Ocultar clave" : "Mostrar clave para verificar"}
-                    >
-                      {showApiKey ? <EyeOff className="w-4 h-4 text-green-400" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-[10px] text-zinc-500 leading-normal font-sans">
-                      Clave oficial en <a href="https://dev.meta.ai/" target="_blank" rel="noopener noreferrer" className="text-green-500 hover:underline">dev.meta.ai</a> o <a href="https://baseten.co/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Baseten</a>.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={isTestingKey || !geminiApiKey.trim()}
-                      onClick={async () => {
-                        setIsTestingKey(true);
-                        setKeyTestResult(null);
-                        const res = await testGeminiConnection(geminiApiKey);
-                        setIsTestingKey(false);
-                        setKeyTestResult(res);
-                      }}
-                      className="text-[10px] font-mono px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-green-400 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
-                    >
-                      {isTestingKey ? 'Probando...' : '⚡ Probar Conexión'}
-                    </button>
-                  </div>
-                  {keyTestResult && (
-                    <div className={`p-2.5 rounded-xl text-xs font-mono border mt-1 ${
-                      keyTestResult.success 
-                        ? 'bg-green-500/10 border-green-500/30 text-green-400' 
-                        : 'bg-red-500/10 border-red-500/30 text-red-400'
-                    }`}>
-                      {keyTestResult.success ? '✅ ' : '❌ '}
-                      {keyTestResult.message}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2 border-t border-zinc-800/80 pt-4">
-                  <button
-                    onClick={() => {
-                      const cleanKey = sanitizeApiKey(geminiApiKey);
-                      setGeminiApiKey(cleanKey);
-                      try {
-                        localStorage.setItem('gemini_api_key', cleanKey);
-                        localStorage.removeItem('gemini_api_key_cleared');
-                        localStorage.setItem('gemini_confirmed_model', 'gemini-3.5-flash');
-                        setApiStatus(cleanKey ? 'browser' : 'none');
-                      } catch (e) {
-                        console.warn("Storage warning:", e);
-                      }
-                      setIsSettingsOpen(false);
-                    }}
-                    className="flex-1 py-2.5 bg-green-500 hover:bg-green-400 text-black font-bold text-xs rounded-xl transition-colors uppercase tracking-wider cursor-pointer"
-                  >
-                    Guardar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGeminiApiKey('');
-                      localStorage.removeItem('gemini_api_key');
-                      localStorage.setItem('gemini_api_key_cleared', 'true');
-                      setApiStatus('none');
-                      setKeyTestResult(null);
-                    }}
-                    className="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-xl transition-colors cursor-pointer"
-                  >
-                    Limpiar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGeminiApiKey(localStorage.getItem('gemini_api_key') || '');
-                      setKeyTestResult(null);
-                      setIsSettingsOpen(false);
-                    }}
-                    className="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-xl transition-colors cursor-pointer"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </>
     );
   };
