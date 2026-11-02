@@ -221,10 +221,23 @@ export async function taskSurveyUniversal(
 export async function splitTaskUniversal(
   task: string,
   surveyAnswers: any,
-  _apiKey?: string,
-  context?: string
+  apiKeyOrContext?: string,
+  contextOrApiKey?: string
 ): Promise<{ steps: string[] }> {
-  const key = getClientApiKey(_apiKey);
+  let context = '';
+  let candidateKey = '';
+
+  if (typeof apiKeyOrContext === 'string') {
+    if (apiKeyOrContext.includes(':') || apiKeyOrContext.includes('\n') || apiKeyOrContext.length > 50) {
+      context = apiKeyOrContext;
+      candidateKey = contextOrApiKey || '';
+    } else {
+      candidateKey = apiKeyOrContext;
+      context = contextOrApiKey || '';
+    }
+  }
+
+  const key = getClientApiKey(candidateKey);
   try {
     const response = await fetch('/api/split-task', {
       method: 'POST',
