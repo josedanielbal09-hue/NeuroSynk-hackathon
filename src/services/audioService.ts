@@ -171,6 +171,78 @@ class AudioService {
 
     this.lastPlayedMap.set(state, now);
   }
+
+  /**
+   * Sintetiza voz empática en español usando Web Speech API nativa.
+   * Adapta automáticamente el rate (velocidad) y tono (pitch) para sonar cálido y humano.
+   */
+  public speak(
+    text: string,
+    options?: {
+      rate?: number;
+      pitch?: number;
+      volume?: number;
+      onStart?: () => void;
+      onEnd?: () => void;
+    }
+  ): void {
+    if (this.muted || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      if (options?.onEnd) options.onEnd();
+      return;
+    }
+
+    try {
+      // Cancelar cualquier alocución anterior para evitar superposiciones
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = window.speechSynthesis.getVoices();
+
+      // Buscar voz nativa en español
+      const spanishVoice = voices.find(v =>
+        v.lang.toLowerCase().startsWith('es-mx') ||
+        v.lang.toLowerCase().startsWith('es-es') ||
+        v.lang.toLowerCase().startsWith('es-us') ||
+        v.lang.toLowerCase().startsWith('es')
+      );
+
+      if (spanishVoice) {
+        utterance.voice = spanishVoice;
+      }
+      utterance.lang = spanishVoice ? spanishVoice.lang : 'es-MX';
+      utterance.rate = options?.rate ?? 0.95;
+      utterance.pitch = options?.pitch ?? 1.05;
+      utterance.volume = options?.volume ?? 0.95;
+
+      utterance.onstart = () => {
+        if (options?.onStart) options.onStart();
+      };
+
+      utterance.onend = () => {
+        if (options?.onEnd) options.onEnd();
+      };
+
+      utterance.onerror = (e) => {
+        console.warn('[AudioService] Evento de error en habla:', e);
+        if (options?.onEnd) options.onEnd();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('[AudioService] Error al sintetizar voz:', err);
+      if (options?.onEnd) options.onEnd();
+    }
+  }
+
+  /**
+   * Detiene de inmediato cualquier alocución en curso.
+   */
+  public stopSpeaking(): void {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
 }
 
 export const audioService = new AudioService();
+

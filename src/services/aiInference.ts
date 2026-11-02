@@ -153,6 +153,18 @@ export async function loadNeuroSynkBrain(): Promise<{ isReady: boolean; metadata
     // 2. Cargar Red Neuronal de TensorFlow.js (Definitive Pure Core v3.0)
     loadedModel = await tf.loadLayersModel('/models/model.json');
 
+    // 3. Pre-compilación asíncrona de shaders WebGL (Zero-Latency Warmup)
+    try {
+      tf.tidy(() => {
+        const dummyInput = tf.zeros([1, 12]);
+        const res = loadedModel.predict(dummyInput) as any;
+        if (res && res.dataSync) res.dataSync();
+      });
+      console.log("⚡ [NeuroSynk AI Core] Shaders WebGL pre-compilados (Warmup exitoso).");
+    } catch (warmupErr) {
+      console.warn("⚠️ [NeuroSynk AI Warmup] Aviso menor en warmup:", warmupErr);
+    }
+
     console.log("🧠 [NeuroSynk AI Core] Red Neuronal cargada con éxito (10,739 muestras). Precisión esperada:", loadedMetadata?.accuracy || "93.6%");
     isModelLoading = false;
     return { isReady: true, metadata: loadedMetadata };

@@ -1,10 +1,61 @@
+# Dependencies & Build
 node_modules/
 build/
 dist/
 coverage/
+.vite/
 .DS_Store
 *.log
+logs/
+
+# Environment variables & secrets (Preserve only example template)
 .env*
 !.env.example
-.vite/
 *.local
+
+# Biometric datasets & raw sensor recordings (Edge Privacy)
+*.csv
+dataset_*/
+datasets_para_entrenar*
+neurosynk_dataset/
+recolector_datos_ia/
+recolector_datos_ia_deploy/
+
+# Clinical study reports & subject analytics
+*.xlsx
+*.xls
+reportes_graficos/
+
+# Compressed archives & legacy backups
+*.zip
+*.tar
+*.tar.gz
+backups/
+legacy_archive/
+neurosynk_mvp_solito/
+neurosynk-mvp-ai/
+
+# Python environments, ML cache & training laboratories
+.venv/
+venv/
+__pycache__/
+*.pyc
+backend-ai-python/
+entrenamiento_ia_core/
+mlops_experiments/
+neurosynk_lab_ia/
+tfjs_model/
+trained_model/
+*.ipynb
+
+# Local training scripts & experiment runners
+scripts/
+ds.py
+modal_inference.py
+neurosynk_agent_trainer.py
+restaurar_modelo_anterior.*
+
+# Windows batch files & local IDE configuration
+*.bat
+.vscode/
+.idea/

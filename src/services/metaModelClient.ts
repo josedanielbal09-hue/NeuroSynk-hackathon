@@ -64,13 +64,19 @@ export function sanitizeApiKey(raw: string): string {
 
 export async function testMetaModelConnection(apiKey?: string): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await fetch('/api/api-status');
+    const key = (apiKey || (typeof localStorage !== 'undefined' ? localStorage.getItem('gemini_api_key') : '') || '').trim();
+    const res = await fetch('/api/api-status', {
+      headers: key ? { 'x-api-key': key } : undefined
+    });
     if (res.ok) {
       const data = await res.json();
-      if (data.hasBasetenKey || data.hasMetaKey) {
+      if (data.hasBasetenKey || data.hasMetaKey || data.hasGeminiKey) {
+        let name = 'Meta Model API';
+        if (data.activeProvider === 'baseten') name = 'Baseten (Muse Spark Open)';
+        else if (data.activeProvider === 'gemini') name = 'Google Gemini';
         return {
           success: true,
-          message: `Conectado a ${data.activeProvider === 'baseten' ? 'Baseten (Muse Spark Open)' : 'Meta Model API'}`
+          message: `Conectado a ${name}`
         };
       }
     }
@@ -83,6 +89,15 @@ export async function testMetaModelConnection(apiKey?: string): Promise<{ succes
 // Alias de retrocompatibilidad
 export const testGeminiConnection = testMetaModelConnection;
 
+function getClientApiKey(explicitKey?: string): string {
+  if (explicitKey && explicitKey.trim()) return explicitKey.trim();
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem('gemini_api_key');
+    if (stored && stored.trim()) return stored.trim();
+  }
+  return '';
+}
+
 export async function chatUniversal(
   messages: any[] | string,
   _apiKey?: string,
@@ -93,17 +108,22 @@ export async function chatUniversal(
   const userText = Array.isArray(messages)
     ? (messages[messages.length - 1]?.content || '')
     : (typeof messages === 'string' ? messages : '');
+  const key = getClientApiKey(_apiKey);
 
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'x-api-key': key } : {})
+      },
       body: JSON.stringify({
         message: userText,
         messages: Array.isArray(messages) ? messages : undefined,
         currentStep,
         taskContext,
-        telemetry
+        telemetry,
+        apiKey: key
       })
     });
     if (response.ok) {
@@ -117,13 +137,18 @@ export async function chatUniversal(
 }
 
 export async function sessionDebriefUniversal(
-  payload: SessionDebriefPayload
+  payload: SessionDebriefPayload,
+  _apiKey?: string
 ): Promise<SessionDebriefResult> {
+  const key = getClientApiKey(_apiKey);
   try {
     const response = await fetch('/api/session-debrief', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'x-api-key': key } : {})
+      },
+      body: JSON.stringify({ ...payload, apiKey: key })
     });
     if (response.ok) {
       const data = await response.json();
@@ -143,11 +168,15 @@ export async function taskSurveyUniversal(
   task: string,
   _apiKey?: string
 ): Promise<{ questions: any[] }> {
+  const key = getClientApiKey(_apiKey);
   try {
     const response = await fetch('/api/task-survey', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task })
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'x-api-key': key } : {})
+      },
+      body: JSON.stringify({ task, apiKey: key })
     });
     if (response.ok) {
       const data = await response.json();
@@ -195,11 +224,15 @@ export async function splitTaskUniversal(
   _apiKey?: string,
   context?: string
 ): Promise<{ steps: string[] }> {
+  const key = getClientApiKey(_apiKey);
   try {
     const response = await fetch('/api/split-task', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task, surveyAnswers, context })
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'x-api-key': key } : {})
+      },
+      body: JSON.stringify({ task, surveyAnswers, context, apiKey: key })
     });
     if (response.ok) {
       const data = await response.json();
@@ -231,11 +264,17 @@ export async function subdivideStepUniversal(
 ): Promise<{ subSteps: string[] }> {
   const taskContext = typeof taskContextOrStepNum === 'string' ? taskContextOrStepNum : (typeof stepNumberOrApiKey === 'string' ? stepNumberOrApiKey : '');
   const stepNumber = typeof taskContextOrStepNum === 'number' ? taskContextOrStepNum : (typeof stepNumberOrApiKey === 'number' ? stepNumberOrApiKey : 1);
+  const explicitKey = typeof stepNumberOrApiKey === 'string' && stepNumberOrApiKey.length > 20 ? stepNumberOrApiKey : _apiKey;
+  const key = getClientApiKey(explicitKey);
+
   try {
     const response = await fetch('/api/subdivide-step', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parentStep, stepNumber, taskContext })
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'x-api-key': key } : {})
+      },
+      body: JSON.stringify({ parentStep, stepNumber, taskContext, apiKey: key })
     });
     if (response.ok) {
       const data = await response.json();
@@ -254,6 +293,50 @@ export async function subdivideStepUniversal(
       "ESCRIBE la primera palabra clave para romper la inercia."
     ]
   };
+}
+
+/**
+ * Solicita a Meta Muse Spark una celebración verbal humana y específica
+ * de la actividad/paso que el usuario acaba de dominar.
+ */
+export async function celebrateStepUniversal(
+  completedStep: string,
+  nextStep?: string,
+  taskContext?: string
+): Promise<string> {
+  const getDynamicFallback = (step: string): string => {
+    const clean = step.replace(/^(\d+\.?\s*|[-•*]\s*)/, '').trim();
+    const match = clean.match(/^([A-ZÁÉÍÓÚÑ]{3,})\s+(.*)/i);
+    if (match) {
+      const verb = match[1].toLowerCase();
+      const rest = match[2].slice(0, 42).replace(/[.,;:].*$/, '').trim();
+      return `¡Gran trabajo al ${verb} ${rest}! Mantén ese impulso.`;
+    }
+    return `¡Paso superado con éxito! Seguimos con el siguiente objetivo.`;
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2800);
+    const response = await fetch('/api/step-celebration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completedStep, nextStep, taskContext }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.phrase && typeof data.phrase === 'string' && data.phrase.trim().length > 0) {
+        return data.phrase.replace(/["*]/g, '').trim();
+      }
+    }
+  } catch (err) {
+    console.warn('[Celebrate Step Client] Fallback:', err);
+  }
+
+  return getDynamicFallback(completedStep);
 }
 
 /**

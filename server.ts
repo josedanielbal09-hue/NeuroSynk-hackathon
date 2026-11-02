@@ -14,6 +14,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 const META_API_KEY = (process.env.MODEL_API_KEY || process.env.META_MODEL_API_KEY || process.env.META_API_KEY || '').trim();
 const META_API_URL = process.env.META_API_URL || "https://api.meta.ai/v1/responses";
 const BASETEN_API_KEY = (process.env.BASETEN_API_KEY || '').trim();
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 
 interface MetaCallParams {
   model?: string;
@@ -22,11 +23,40 @@ interface MetaCallParams {
   temperature?: number;
   maxTokens?: number;
   reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  apiKeyOverride?: string;
+}
+
+/**
+ * Robust fetch wrapper with timeout and 1-2 retries for transient socket closes (e.g. idle Keep-Alive drops)
+ */
+async function fetchWithRetry(url: string, options: any, retries = 2, timeoutMs = 15000): Promise<Response> {
+  let lastError: any = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      return res;
+    } catch (err: any) {
+      clearTimeout(timeout);
+      lastError = err;
+      const detail = err?.cause?.message || err?.cause || err?.message || err;
+      if (attempt < retries) {
+        console.warn(`[Network Retry] Attempt ${attempt + 1} to ${new URL(url).host} failed (${detail}). Re-trying on fresh socket...`);
+        await new Promise(r => setTimeout(r, 400));
+      }
+    }
+  }
+  throw lastError;
 }
 
 /**
  * Universal caller prioritizing Meta Model API (Muse Spark / Wonder)
- * with graceful fallback to Baseten and offline deterministic heuristics.
+ * with graceful fallback to Baseten and Google Gemini.
  */
 async function callMetaModel(params: MetaCallParams): Promise<string> {
   const model = params.model || "muse-wonder-1.0";
@@ -39,7 +69,7 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
   // 1. Try Meta Model API (Official dev.meta.ai responses endpoint)
   if (META_API_KEY) {
     try {
-      const response = await fetch(META_API_URL, {
+      const response = await fetchWithRetry(META_API_URL, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${META_API_KEY}`,
@@ -86,15 +116,16 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
         }
       }
     } catch (metaErr: any) {
-      console.warn(`[Meta Model API] Call failed (${metaErr?.message || metaErr}), trying Baseten fallback...`);
+      console.warn(`[Meta Model API] Call failed (${metaErr?.cause?.message || metaErr?.message || metaErr}), trying Baseten fallback...`);
     }
   }
 
-  // 2. Try Baseten fallback
+  // 2. Try Baseten fallback (Muse Spark Open)
   if (BASETEN_API_KEY) {
     try {
       const basetenUrl = process.env.BASETEN_ENDPOINT_URL || "https://inference.baseten.co/v1/chat/completions";
-      const basetenRes = await fetch(basetenUrl, {
+      const tokenBudget = Math.max(params.maxTokens ?? 2048, 800);
+      const basetenRes = await fetchWithRetry(basetenUrl, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${BASETEN_API_KEY}`,
@@ -105,14 +136,31 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
           messages,
           reasoning_effort: params.reasoningEffort || "minimal",
           temperature: params.temperature ?? 0.7,
-          max_tokens: Math.max(params.maxTokens ?? 1024, 450)
+          max_tokens: tokenBudget
         })
       });
 
       if (basetenRes.ok) {
         const data = await basetenRes.json();
         const choice = data.choices?.[0];
-        const text = (choice?.message?.content || choice?.message?.reasoning_content || "").trim();
+        let text = (choice?.message?.content || "").trim();
+
+        // 1. Eliminar etiquetas de razonamiento interno de deepseek/meta si existen
+        text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+        // 2. Si NO es JSON y contiene restos del monólogo interno en inglés del modelo, limpiarlo
+        const looksLikeJson = /\{[\s\S]*\}|\[[\s\S]*\]/.test(text);
+        if (!looksLikeJson && /Starts with|Need to consider|We should|Potential nuance|Count:|Let's evaluate/i.test(text)) {
+          const quoteMatch = text.match(/"([^"]{10,140})"/);
+          if (quoteMatch) {
+            text = quoteMatch[1].trim();
+          } else {
+            const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+            const cleanLines = lines.filter(l => !/Starts with|Need to consider|We should|Potential nuance|Count:|Let's evaluate/i.test(l));
+            text = cleanLines.length > 0 ? cleanLines[cleanLines.length - 1] : "";
+          }
+        }
+
         if (text.length > 0) {
           return text;
         }
@@ -121,7 +169,40 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
         console.warn(`[Baseten Fallback] Status ${basetenRes.status}: ${errBody}`);
       }
     } catch (basetenErr: any) {
-      console.warn(`[Baseten Fallback] Call failed:`, basetenErr?.message || basetenErr);
+      console.warn(`[Baseten Fallback] Call failed:`, basetenErr?.cause?.message || basetenErr?.message || basetenErr);
+    }
+  }
+
+  // 3. Try Google Gemini Fallback (Gemini 2.5 Flash)
+  const effectiveGeminiKey = (params.apiKeyOverride || GEMINI_API_KEY).trim();
+  if (effectiveGeminiKey) {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${effectiveGeminiKey}`;
+      const geminiPrompt = (params.systemPrompt ? `[INSTRUCCIÓN DEL SISTEMA]:\n${params.systemPrompt}\n\n` : '') + params.userPrompt;
+      const geminiRes = await fetchWithRetry(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: geminiPrompt }] }],
+          generationConfig: {
+            temperature: params.temperature ?? 0.7,
+            maxOutputTokens: params.maxTokens ?? 2048
+          }
+        })
+      });
+
+      if (geminiRes.ok) {
+        const data = await geminiRes.json();
+        const geminiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (geminiText && geminiText.trim().length > 0) {
+          return geminiText.trim();
+        }
+      } else {
+        const errBody = await geminiRes.text();
+        console.warn(`[Gemini Fallback] Status ${geminiRes.status}: ${errBody}`);
+      }
+    } catch (geminiErr: any) {
+      console.warn(`[Gemini Fallback] Call failed:`, geminiErr?.cause?.message || geminiErr?.message || geminiErr);
     }
   }
 
@@ -133,7 +214,8 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
 // =========================================================================
 
 app.post("/api/task-survey", async (req, res) => {
-  const { task } = req.body;
+  const { task, apiKey } = req.body;
+  const headerKey = (req.headers['x-api-key'] as string) || apiKey;
   if (!task) {
     res.status(400).json({ error: "Task is required" });
     return;
@@ -197,7 +279,10 @@ Responde estrictamente con un JSON con la clave "questions": array de objetos co
     const text = await callMetaModel({
       model: "muse-wonder-1.0",
       systemPrompt: prompt_sistema,
-      userPrompt: `Meta del usuario: "${task}"`
+      userPrompt: `Meta del usuario: "${task}"`,
+      maxTokens: 2048,
+      reasoningEffort: "minimal",
+      apiKeyOverride: headerKey
     });
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -209,14 +294,15 @@ Responde estrictamente con un JSON con la clave "questions": array de objetos co
       }
     }
   } catch (error: any) {
-    console.warn("[Task Survey] Using adaptive fallback:", error?.message || error);
+    console.warn("[Task Survey] Using adaptive fallback:", error?.cause?.message || error?.message || error);
   }
 
   res.json(fallbackSurvey);
 });
 
 app.post("/api/split-task", async (req, res) => {
-  const { task, surveyAnswers, context } = req.body;
+  const { task, surveyAnswers, context, apiKey } = req.body;
+  const headerKey = (req.headers['x-api-key'] as string) || apiKey;
   if (!task) {
     res.status(400).json({ error: "Task is required" });
     return;
@@ -270,7 +356,9 @@ Responde estrictamente con un JSON con la clave "steps": array de strings.`;
       model: "muse-wonder-1.0",
       systemPrompt: prompt_sistema,
       userPrompt: `OBJETIVO: "${task}"\nRESPUESTAS: ${JSON.stringify(surveyAnswers || {})}\nCONTEXTO: "${context || 'General'}"`,
-      reasoningEffort: "high"
+      reasoningEffort: "minimal",
+      maxTokens: 2048,
+      apiKeyOverride: headerKey
     });
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -283,14 +371,69 @@ Responde estrictamente con un JSON con la clave "steps": array de strings.`;
       }
     }
   } catch (err: any) {
-    console.warn("[Split Task] Using deterministic fallback:", err?.message || err);
+    console.warn("[Split Task] Using deterministic fallback:", err?.cause?.message || err?.message || err);
   }
 
   res.json({ steps: getFallbackSteps(task, surveyAnswers) });
 });
 
+/**
+ * Endpoint de Celebración Dinámica con IA por cada micro-paso completado.
+ * FocusBud vocaliza una frase humana que reconoce ESPECÍFICAMENTE la actividad dominada.
+ */
+app.post("/api/step-celebration", async (req, res) => {
+  const { completedStep, nextStep, taskContext, apiKey } = req.body;
+  const headerKey = (req.headers['x-api-key'] as string) || apiKey;
+  if (!completedStep) {
+    res.status(400).json({ error: "completedStep is required" });
+    return;
+  }
+
+  const getDynamicFallback = (step: string): string => {
+    const clean = step.replace(/^(\d+\.?\s*|[-•*]\s*)/, '').trim();
+    const match = clean.match(/^([A-ZÁÉÍÓÚÑ]{3,})\s+(.*)/i);
+    if (match) {
+      const verb = match[1].toLowerCase();
+      const rest = match[2].slice(0, 42).replace(/[.,;:].*$/, '').trim();
+      return `¡Gran trabajo al ${verb} ${rest}! Mantén ese impulso.`;
+    }
+    return `¡Paso superado con éxito! Seguimos con el siguiente objetivo.`;
+  };
+
+  try {
+    const prompt_sistema = `Eres FocusBud, el avatar de NeuroSynk empático, humano y enérgico impulsado por Meta Muse Spark.
+Tu usuario acaba de completar un micro-paso de su sesión de enfoque.
+Formula una sola frase natural, breve, cálida y motivadora (MÁXIMO 14 PALABRAS) que reconozca ESPECÍFICAMENTE la actividad concreta que acaba de dominar para que sienta que lo estás acompañando de verdad en tiempo real.
+Habla en español directo, entusiasta y humano. Cero formato markdown y sin comillas.`;
+
+    const text = await callMetaModel({
+      model: "muse-spark-1.0",
+      systemPrompt: prompt_sistema,
+      userPrompt: `Actividad completada: "${completedStep}"\nSiguiente paso: "${nextStep || 'siguiente'}"\nMeta general: "${taskContext || ''}"`,
+      maxTokens: 600,
+      reasoningEffort: "minimal",
+      temperature: 0.75,
+      apiKeyOverride: headerKey
+    });
+
+    let cleanText = text.replace(/["*]/g, '').trim();
+    const lines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);
+    cleanText = lines[lines.length - 1] || cleanText;
+
+    if (cleanText.length > 5) {
+      res.json({ phrase: cleanText });
+      return;
+    }
+  } catch (err: any) {
+    console.warn("[Step Celebration] Using dynamic fallback:", err?.cause?.message || err?.message || err);
+  }
+
+  res.json({ phrase: getDynamicFallback(completedStep) });
+});
+
 app.post("/api/subdivide-step", async (req, res) => {
-  const { parentStep, taskContext } = req.body;
+  const { parentStep, taskContext, apiKey } = req.body;
+  const headerKey = (req.headers['x-api-key'] as string) || apiKey;
   if (!parentStep) {
     res.status(400).json({ error: "parentStep is required" });
     return;
@@ -311,7 +454,8 @@ Responde estrictamente con un JSON con la clave "subSteps": array de 3 strings.`
     const text = await callMetaModel({
       model: "muse-spark-1.0",
       systemPrompt: prompt_sistema,
-      userPrompt: `Paso bloqueado: "${parentStep}"\nContexto: "${taskContext || 'General'}"`
+      userPrompt: `Paso bloqueado: "${parentStep}"\nContexto: "${taskContext || 'General'}"`,
+      apiKeyOverride: headerKey
     });
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -323,14 +467,15 @@ Responde estrictamente con un JSON con la clave "subSteps": array de 3 strings.`
       }
     }
   } catch (err: any) {
-    console.warn("[Subdivide Step] Using fallback:", err?.message || err);
+    console.warn("[Subdivide Step] Using fallback:", err?.cause?.message || err?.message || err);
   }
 
   res.json({ subSteps: fallbackSubSteps });
 });
 
 app.post("/api/chat", async (req, res) => {
-  const { message, messages, currentStep, taskContext, telemetry } = req.body;
+  const { message, messages, currentStep, taskContext, telemetry, apiKey } = req.body;
+  const headerKey = (req.headers['x-api-key'] as string) || apiKey;
   const userText = message || (Array.isArray(messages) && messages.length > 0 
     ? (messages[messages.length - 1].content || messages[messages.length - 1].text || '') 
     : '');
@@ -367,13 +512,14 @@ Inicia SIEMPRE con un VERBO DE ACCIÓN EN MAYÚSCULAS. Cero Markdown. Tono de co
       systemPrompt: prompt_sistema,
       userPrompt: `Paso activo: "${currentStep || 'Trabajo'}"\nContexto: "${taskContext || 'General'}"\nMensaje: "${userText}"`,
       reasoningEffort: "minimal",
-      maxTokens: 750
+      maxTokens: 750,
+      apiKeyOverride: headerKey
     });
 
     const cleanReply = text.replace(/[*_#]/g, '').trim();
     res.json({ reply: cleanReply || "AVANZA con el primer detalle del paso. Estamos contigo." });
   } catch (err: any) {
-    console.warn("[Chat] Using adaptive reply:", err?.message || err);
+    console.warn("[Chat] Using adaptive reply:", err?.cause?.message || err?.message || err);
     res.json({ reply: "DIVIDE el paso en su mínima expresión. Escribe la primera palabra para arrancar." });
   }
 });
@@ -390,8 +536,10 @@ app.post("/api/session-debrief", async (req, res) => {
     totalStepsCount = 0,
     averageFocus = 80,
     flowPercentage = 0,
-    fatigueEventsCount = 0
+    fatigueEventsCount = 0,
+    apiKey
   } = req.body;
+  const headerKey = (req.headers['x-api-key'] as string) || apiKey;
 
   const fallbackSummary = `SESIÓN CONCLUIDA: Has completado ${completedStepsCount} de ${totalStepsCount} pasos en "${task}". Tu promedio de enfoque se mantuvo en ${averageFocus}%. Excelente persistencia. Toma 5 minutos para estirarte y descansar la vista antes de tu siguiente bloque.`;
 
@@ -416,22 +564,26 @@ Picos de fatiga gestionados: ${fatigueEventsCount}`;
       systemPrompt: prompt_sistema,
       userPrompt,
       reasoningEffort: "minimal",
-      maxTokens: 750
+      maxTokens: 750,
+      apiKeyOverride: headerKey
     });
 
     const clean = text.replace(/[*_#]/g, '').trim();
     res.json({ debrief: clean || fallbackSummary });
   } catch (err: any) {
-    console.warn("[Session Debrief] Using fallback:", err?.message || err);
+    console.warn("[Session Debrief] Using fallback:", err?.cause?.message || err?.message || err);
     res.json({ debrief: fallbackSummary });
   }
 });
 
 app.get("/api/api-status", (req, res) => {
+  const headerKey = ((req.headers['x-api-key'] as string) || '').trim();
+  const hasGemini = !!(GEMINI_API_KEY || headerKey);
   res.json({
     hasMetaKey: !!META_API_KEY,
     hasBasetenKey: !!BASETEN_API_KEY,
-    activeProvider: META_API_KEY ? "meta-model-api" : (BASETEN_API_KEY ? "baseten" : "offline-adaptive")
+    hasGeminiKey: hasGemini,
+    activeProvider: META_API_KEY ? "meta-model-api" : (BASETEN_API_KEY ? "baseten" : (hasGemini ? "gemini" : "offline-adaptive"))
   });
 });
 
@@ -449,20 +601,45 @@ app.post("/api/meta/muse-spark/stream", async (req, res) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  const prompt = `Usuario en sesión de trabajo. Estado: PERCLOS=${perclos}%, Fatiga=${fatigueScore}/100, Postura=${postureScore}/100, Clasificación=${cognitiveClass}. Tarea: "${currentTask}". Genera UNA sola micro-instrucción empática de máximo 15 palabras iniciando con verbo de acción en MAYÚSCULAS.`;
+  const prompt = `Usuario en sesión de trabajo. Estado biométrico: PERCLOS=${perclos}%, Fatiga=${fatigueScore}/100, Postura=${postureScore}/100, Estado=${cognitiveClass}. Tarea: "${currentTask}".
+Instrucción ESTRICTA: Genera ÚNICAMENTE UNA sola micro-instrucción en español de MÁXIMO 12 PALABRAS que inicie con un VERBO DE ACCIÓN EN MAYÚSCULAS. Cero explicaciones, cero inglés, cero razonamiento.`;
 
   try {
     const text = await callMetaModel({
       model: "muse-spark-1.0",
       userPrompt: prompt,
-      temperature: 0.5,
-      maxTokens: 450
+      temperature: 0.4,
+      maxTokens: 750
     });
 
-    const words = text.split(" ");
+    let cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#"`]/g, '').trim();
+
+    // Extraer comillas si las hay
+    const quoteMatch = cleanText.match(/"([^"]{10,120})"/);
+    if (quoteMatch) {
+      cleanText = quoteMatch[1].trim();
+    }
+
+    // Si tiene más de 16 palabras o restos de inglés, usar fallback clínico adaptativo
+    const wordCount = cleanText.split(/\s+/).filter(Boolean).length;
+    if (wordCount > 16 || /Starts with|Need to consider|We should|Count:|PERCLOS|User prompt/i.test(cleanText) || !cleanText) {
+      if (perclos > 20 || fatigueScore > 50) {
+        cleanText = "DESCANSA tu mirada 5 segundos fuera de la pantalla y respira hondo.";
+      } else if (postureScore > 40) {
+        cleanText = "AJUSTA tu espalda y relaja los hombros para despejar la mente.";
+      } else if (String(cognitiveClass).includes('AGOBIO') || String(cognitiveClass).includes('SOBRE')) {
+        cleanText = "PAUSA un instante. Da un solo clic sin prisa; estamos contigo.";
+      } else if (String(cognitiveClass).includes('FLOW')) {
+        cleanText = "MANTÉN este ritmo. Tu foco está en su punto más alto.";
+      } else {
+        cleanText = "ENFOCA el primer detalle del paso activo. Vamos a buen ritmo.";
+      }
+    }
+
+    const words = cleanText.split(" ");
     for (const w of words) {
       res.write(`${w} `);
-      await new Promise(r => setTimeout(r, 30));
+      await new Promise(r => setTimeout(r, 35));
     }
     res.end();
   } catch (err) {

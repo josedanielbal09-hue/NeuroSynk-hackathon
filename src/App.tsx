@@ -1,12 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Activity, BrainCircuit, CheckCircle, Target, ArrowRight, Play, Pause, Eye, EyeOff, Timer, MessageSquare, Send, Settings, Sparkles, Cpu, ShieldCheck, Headphones, Volume2, Sliders } from 'lucide-react';
+import { Activity, BrainCircuit, CheckCircle, Target, ArrowRight, Play, Pause, Eye, EyeOff, Timer, MessageSquare, Send, Settings, Sparkles, Cpu, ShieldCheck, Headphones, Volume2, Sliders, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { loadNeuroSynkBrain, evaluateAIBiometrics, AIPredictionResult } from './services/aiInference';
 import { FocusBudWidget } from './components/avatar/FocusBudWidget';
 import { FocusState } from './config/avatarConfig';
 import { getBudContextualMessage } from './utils/budMessages';
 import { brownNoise } from './utils/audioEngine';
+import { audioService } from './services/audioService';
+import { avatarBridge } from './services/avatarBridge';
 import { GroundingBreak } from './components/GroundingBreak';
+import { GeminiHeroInput } from './components/home/GeminiHeroInput';
+import { CollapsibleSidebar, SavedSessionItem } from './components/navigation/CollapsibleSidebar';
+import { PreWarmupScreen, WarmupStep } from './components/PreWarmupScreen';
 import {
   chatUniversal,
   taskSurveyUniversal,
@@ -16,9 +21,11 @@ import {
   sanitizeApiKey,
   streamMuseSparkIntervention,
   sessionDebriefUniversal,
+  celebrateStepUniversal,
   BiometricTelemetryPayload,
   SessionDebriefResult
 } from './services/metaModelClient';
+import { KawaiiRewardCelebration, REWARD_ARCHETYPES } from './components/rewards/KawaiiRewardCelebration';
 
 
 declare global {
@@ -38,6 +45,8 @@ declare global {
     POSE_CONNECTIONS: any;
   }
 }
+
+
 
 interface NeuroMascotProps {
   expression?: 'normal' | 'blink' | 'happy';
@@ -231,6 +240,14 @@ export default function App() {
   const [isTimerConfigOpen, setIsTimerConfigOpen] = useState<boolean>(false);
 
   const [isAppLoading, setIsAppLoading] = useState(true);
+  const [isPreWarmupVisible, setIsPreWarmupVisible] = useState(true);
+  const [warmupProgress, setWarmupProgress] = useState(25);
+  const [warmupSteps, setWarmupSteps] = useState<WarmupStep[]>([
+    { id: 'webgl', label: 'Motor Neural WebGL (TensorFlow.js)', status: 'loading', detail: 'COMPILANDO' },
+    { id: 'mediapipe', label: 'Visión Biomecánica (MediaPipe Holistic)', status: 'pending' },
+    { id: 'camera', label: 'Sensor Óptico y Calibración Basal', status: 'pending' }
+  ]);
+  const hasFirstLandmarkRef = useRef(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [mascotExpression, setMascotExpression] = useState<'normal' | 'blink' | 'happy'>('normal');
   const [proposedChange, setProposedChange] = useState<{ proposedTask: string; proposedSteps: string[] } | null>(null);
@@ -245,6 +262,42 @@ export default function App() {
       : '';
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const handleStartNewSession = () => {
+    setIsStarted(false);
+    setShowSurvey(false);
+    setAppStage('LOGIN');
+    setTask('');
+    setSteps([]);
+    setCurrentStepIdx(0);
+    setChatMessages([]);
+    setSessionDebrief(null);
+    debriefRequestedRef.current = false;
+    setElapsedTime(0);
+    setIsPaused(false);
+    setTimerSecondsLeft(workDuration);
+    setTimerMode('WORK');
+    setCompletedBlocks(0);
+    setIsShowingReward(false);
+    setIsDebriefLoading(false);
+    focusSamplesRef.current = [];
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const handleSelectPastSession = (item: SavedSessionItem) => {
+    setTask(item.task);
+    setIsStarted(false);
+    setShowSurvey(false);
+    setAppStage('LOGIN');
+    setSteps([]);
+    setCurrentStepIdx(0);
+    setChatMessages([]);
+    setSessionDebrief(null);
+    debriefRequestedRef.current = false;
+  };
   const [showApiKey, setShowApiKey] = useState(false);
   const [isTestingKey, setIsTestingKey] = useState(false);
   const [keyTestResult, setKeyTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -281,29 +334,6 @@ export default function App() {
     checkApiStatus();
   }, [geminiApiKey]);
 
-  useEffect(() => {
-    if (!isAppLoading) return;
-    const duration = 2500;
-    const intervalTime = 25;
-    const step = 100 / (duration / intervalTime);
-
-    const timer = setInterval(() => {
-      setLoadingProgress(prev => {
-        const next = prev + step;
-        if (next >= 100) {
-          clearInterval(timer);
-          setMascotExpression('happy');
-          setTimeout(() => {
-            setIsAppLoading(false);
-          }, 600);
-          return 100;
-        }
-        return next;
-      });
-    }, intervalTime);
-
-    return () => clearInterval(timer);
-  }, [isAppLoading]);
 
   // Chat States
   const [chatMessages, setChatMessages] = useState<{ role: string, content: string }[]>([
@@ -357,10 +387,14 @@ export default function App() {
   const pendingClassRef = useRef<number | null>(null);
   const pendingClassSinceRef = useRef<number>(0);
 
-  // Carga inicial del cerebro IA
+  // Carga inicial del cerebro IA y pre-compilación de shaders WebGL
   useEffect(() => {
     loadNeuroSynkBrain().then(res => {
       setIsAIBrainReady(res.isReady);
+      if (res.isReady) {
+        setWarmupSteps(prev => prev.map(s => s.id === 'webgl' ? { ...s, status: 'completed', detail: '60 FPS' } : (s.id === 'mediapipe' ? { ...s, status: 'loading', detail: 'WASM ACTIVO' } : s)));
+        setWarmupProgress(prev => Math.max(prev, 50));
+      }
     });
   }, []);
 
@@ -378,8 +412,47 @@ export default function App() {
   });
   const lastPostureUpdateRef = useRef<number>(0);
 
-  // Streaming de micro-intervención de Muse Spark hacia FocusBud
+  // Streaming y voz de micro-intervención de Muse Spark hacia FocusBud
   const isBudStreamingRef = useRef<boolean>(false);
+  const [isBudSpeaking, setIsBudSpeaking] = useState<boolean>(false);
+  const isBudSpeakingAudioRef = useRef<boolean>(false);
+  const lastSpokenTimeRef = useRef<number>(0);
+
+  /**
+   * Helper unificado para que FocusBud hable de forma autónoma con síntesis de voz real en español
+   * y sincronice su boca animada y el bocadillo visual superior.
+   */
+  const speakFocusBud = (text: string, options?: { rate?: number; pitch?: number; force?: boolean }) => {
+    if (!text || typeof window === 'undefined') return;
+    const now = Date.now();
+    // Prevenir colisiones o spam si ya está hablando (a menos que sea forzado)
+    if (!options?.force && (isBudSpeakingAudioRef.current || (now - lastSpokenTimeRef.current < 3500))) {
+      setBudMessage(text);
+      return;
+    }
+
+    lastSpokenTimeRef.current = now;
+    isBudSpeakingAudioRef.current = true;
+    setIsBudSpeaking(true);
+    setBudMessage(text);
+
+    audioService.speak(text, {
+      rate: options?.rate ?? 1.0,
+      pitch: options?.pitch ?? 1.08,
+      onStart: () => {
+        setIsBudSpeaking(true);
+        isBudSpeakingAudioRef.current = true;
+      },
+      onEnd: () => {
+        setIsBudSpeaking(false);
+        isBudSpeakingAudioRef.current = false;
+        setTimeout(() => {
+          setBudMessage(prev => (prev === text ? '' : prev));
+        }, 3200);
+      }
+    });
+  };
+
 
   // Métricas acumuladas para el debriefing cognitivo post-sesión
   const focusSamplesRef = useRef<number[]>([]);
@@ -556,12 +629,58 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         fatigueEventsCount: fatigueEventsCountRef.current
       }).then(res => {
         setSessionDebrief(res.debrief);
+
+        // Guardar sesión en historial local para la barra lateral
+        try {
+          const rawHistory = localStorage.getItem('neurosynk_session_history');
+          const history = rawHistory ? JSON.parse(rawHistory) : [];
+          history.unshift({
+            id: `session-${Date.now()}`,
+            task: task || 'Sesión de Trabajo',
+            timestamp: Date.now(),
+            durationMinutes: totalMins,
+            completedSteps: steps.length,
+            totalSteps: steps.length,
+            avgFocus: avgFocus,
+            debriefSummary: res.debrief
+          });
+          localStorage.setItem('neurosynk_session_history', JSON.stringify(history.slice(0, 25)));
+        } catch (storageErr) {
+          console.warn("Storage warning:", storageErr);
+        }
+
+        // FocusBud sintetiza el debriefing con voz empática en español (5 a 8 segundos)
+        const spokenDebrief = `¡Sesión completada con éxito! Has finalizado todos los pasos de ${task || 'tu meta'}. Tu enfoque promedio fue de ${avgFocus} por ciento. ¡Excelente constancia!`;
+        speakFocusBud(spokenDebrief, { force: true, rate: 0.98 });
       }).catch(err => {
         console.warn("[Debrief Error]:", err);
-        setSessionDebrief(`SESIÓN CONCLUIDA: Has completado todos los pasos de "${task}". Tu enfoque promedio fue de ${avgFocus}%. Respira hondo y felicítate por este avance tangible.`);
+        const fallback = `SESIÓN CONCLUIDA: Has completado todos los pasos de "${task}". Tu enfoque promedio fue de ${avgFocus}%. Respira hondo y felicítate por este avance tangible.`;
+        setSessionDebrief(fallback);
+
+        try {
+          const rawHistory = localStorage.getItem('neurosynk_session_history');
+          const history = rawHistory ? JSON.parse(rawHistory) : [];
+          history.unshift({
+            id: `session-${Date.now()}`,
+            task: task || 'Sesión de Trabajo',
+            timestamp: Date.now(),
+            durationMinutes: totalMins,
+            completedSteps: steps.length,
+            totalSteps: steps.length,
+            avgFocus: avgFocus,
+            debriefSummary: fallback
+          });
+          localStorage.setItem('neurosynk_session_history', JSON.stringify(history.slice(0, 25)));
+        } catch (storageErr) {
+          console.warn("Storage warning:", storageErr);
+        }
+
+        const spokenFallback = `¡Sesión terminada! Buen trabajo con todos tus pasos. Descansa la mente y estira un poco.`;
+        speakFocusBud(spokenFallback, { force: true, rate: 0.98 });
       }).finally(() => {
         setIsDebriefLoading(false);
       });
+
     }
   }, [currentStepIdx, steps.length, elapsedTime, task]);
 
@@ -645,15 +764,13 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     };
   }, []);
 
-  // UX states for Micro-rewards
+  // UX states for Micro-rewards (Paso 7/8: Celebración Kawaii Anime 60 FPS)
   const [rewardKaomoji, setRewardKaomoji] = useState('');
   const [isShowingReward, setIsShowingReward] = useState(false);
-  const [isStateLocked, setIsStateLocked] = useState(false);
-
-  useEffect(() => {
-    setIsStateLocked(isShowingReward);
-  }, [isShowingReward]);
-  const KAOMOJIS = ["(๑˃̵ᴗ˂̵)و 🚀", "✨ ESTELAR ✨", "🌸 FLUIDO 🌸", "🔥 ¡FUEGO! 🔥", "(ง'̀-'́)ง ⚡️"];
+  const [rewardArchetypeIdx, setRewardArchetypeIdx] = useState(0);
+  const [isStateLocked] = useState(false);
+  const mascotExpressionRef = useRef<'normal' | 'blink' | 'happy'>('normal');
+  const KAOMOJIS = ["(๑˃̵ᴗ˂̵)و 🚀", "✨ ESTELAR ✨", "🌸 FLUIDO 🌸", "⚡️ ENERGÍA ⚡️", "(ง'̀-'́)ง ⚡️"];
 
   // Notificaciones Contextuales de FocusBud (Body Doubling - Fase 4)
   const stepDistractionsRef = useRef<number>(0);
@@ -663,14 +780,14 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
   const currentFocusState: FocusState = (isBreakActive || isPaused)
     ? 'PAUSA'
-    : isStateLocked
+    : isShowingReward
     ? 'CELEBRACION'
     : mapAIPredictionToAvatarState(aiPrediction?.className);
 
   // Estado biométrico directo emitido por la Red Neuronal (ej. 'AGOBIO POSTURAL', 'SOBREESTIMULACIÓN', 'ENFOQUE')
   const rawAIState = (isBreakActive || isPaused)
     ? 'PAUSA'
-    : isStateLocked
+    : isShowingReward
     ? 'CELEBRACION'
     : (aiPrediction?.className || 'ENFOQUE');
 
@@ -734,6 +851,15 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       if (data.proposal) {
         setProposedChange(data.proposal);
       }
+
+      // FocusBud vocaliza en vivo la primera frase de la respuesta (3-5 segundos)
+      const firstSentence = replyText.split(/[.!?]\s+/)[0] || replyText;
+      const cleanVoice = firstSentence.replace(/[*_#"`]/g, '').trim();
+      if (cleanVoice.length > 4 && !cleanVoice.startsWith('⚠️')) {
+        const spokenShort = cleanVoice.length > 85 ? cleanVoice.substring(0, 80) + '...' : cleanVoice;
+        speakFocusBud(spokenShort, { force: true, rate: 1.04 });
+      }
+
     } catch (e) {
       setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Enlace neuronal inestable.' }]);
     } finally {
@@ -926,19 +1052,44 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       setIsLoading(false);
       setIsStarted(true);
       setAppStage('FOCUS');
+
+      // Bienvenida con voz autónoma de FocusBud (3-4 segundos)
+      setTimeout(() => {
+        const welcomePhrases = [
+          `¡Todo listo! Iniciamos la sesión de ${task || 'estudio'}. Te acompaño en cada paso.`,
+          `¡Enfoque activado! Primer micro-paso en marcha. Vamos a nuestro propio ritmo.`
+        ];
+        const phrase = welcomePhrases[Math.floor(Math.random() * welcomePhrases.length)];
+        speakFocusBud(phrase, { force: true, rate: 0.98 });
+      }, 1200);
     }
+
   };
 
   useEffect(() => {
     let animationFrameId: number;
     let isComponentMounted = true;
 
-    if (isStarted && !isSystemBooted.current && videoRef.current && canvasRef.current) {
+    if (!isSystemBooted.current && videoRef.current && canvasRef.current) {
       isSystemBooted.current = true;
       const initSystem = async () => {
+        // Esperar a que MediaPipe esté inyectado en window
+        let waitCount = 0;
+        while (!window.Holistic && waitCount < 30 && isComponentMounted) {
+          await new Promise(r => setTimeout(r, 150));
+          waitCount++;
+        }
+
+        if (!isComponentMounted) return;
+
         if (!window.Holistic) {
-          if (statusRef.current) statusRef.current.textContent = "ESPERANDO MEDIAPIPE CDN...";
-          setTimeout(initSystem, 1000);
+          console.warn("⚠️ MediaPipe CDN no respondió a tiempo. Continuando en modo de resiliencia...");
+          setWarmupSteps(prev => prev.map(s => s.id === 'mediapipe' ? { ...s, status: 'completed', detail: 'CDN OFFLINE' } : s));
+          setWarmupProgress(prev => Math.max(prev, 80));
+          setTimeout(() => {
+            setIsPreWarmupVisible(false);
+            setIsAppLoading(false);
+          }, 600);
           return;
         }
 
@@ -961,6 +1112,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           holistic.onResults(onResults);
           holisticRef.current = holistic;
 
+          if (isComponentMounted) {
+            setWarmupSteps(prev => prev.map(s => s.id === 'mediapipe' ? { ...s, status: 'completed', detail: 'WASM ACTIVO' } : (s.id === 'camera' ? { ...s, status: 'loading', detail: 'ACCEDIENDO' } : s)));
+            setWarmupProgress(prev => Math.max(prev, 70));
+          }
+
           // 2. Solicitar cámara nativa en 640x480
           if (statusRef.current) statusRef.current.textContent = "SOLICITANDO CAMARA...";
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -980,11 +1136,29 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
             videoRef.current.onloadedmetadata = () => {
-              videoRef.current?.play();
+              videoRef.current?.play().catch(e => console.warn("Video play notice:", e));
             };
 
             // 3. Procesamiento controlado de cuadros
             videoRef.current.onplaying = () => {
+              if (isComponentMounted) {
+                setWarmupSteps(prev => prev.map(s => s.id === 'camera' ? { ...s, status: 'completed', detail: 'STREAM ACTIVO' } : s));
+                setWarmupProgress(prev => Math.max(prev, 90));
+              }
+
+              // Fallback de seguridad: si no detecta landmarks en 3.5s, desbloquear suavemente
+              setTimeout(() => {
+                if (!hasFirstLandmarkRef.current && isComponentMounted) {
+                  hasFirstLandmarkRef.current = true;
+                  setWarmupSteps(prev => prev.map(s => ({ ...s, status: 'completed', detail: s.detail || 'STREAM ACTIVO' })));
+                  setWarmupProgress(100);
+                  setTimeout(() => {
+                    setIsPreWarmupVisible(false);
+                    setIsAppLoading(false);
+                  }, 400);
+                }
+              }, 3500);
+
               if (statusRef.current) statusRef.current.textContent = "ANALIZANDO BIOMETRIA...";
 
               let isProcessing = false;
@@ -1022,10 +1196,18 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             };
           }
         } catch (error) {
-          console.error("Camera access denied or error:", error);
+          console.warn("[Hardware Warmup] Acceso a cámara opcional o bloqueado:", error);
+          if (isComponentMounted) {
+            setWarmupSteps(prev => prev.map(s => s.id === 'camera' ? { ...s, status: 'completed', detail: 'MODO SIN CAMARA' } : s));
+            setWarmupProgress(100);
+            setTimeout(() => {
+              setIsPreWarmupVisible(false);
+              setIsAppLoading(false);
+            }, 600);
+          }
           if (statusRef.current) {
-            statusRef.current.textContent = "ERROR: ACCESO A CAMARA DENEGADO";
-            statusRef.current.className = "px-4 py-2 mt-4 rounded-md border font-mono text-xs tracking-wider absolute top-4 left-4 bg-red-500/10 text-red-500 border-red-500/30 uppercase shadow-2xl backdrop-blur-md";
+            statusRef.current.textContent = "MODO LOCAL SIN CAMARA";
+            statusRef.current.className = "px-4 py-2 mt-4 rounded-md border font-mono text-xs tracking-wider absolute top-4 left-4 bg-zinc-800/80 text-zinc-400 border-zinc-700/50 uppercase shadow-2xl backdrop-blur-md";
           }
         }
       };
@@ -1049,39 +1231,54 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         holisticRef.current = null;
       }
     };
-  }, [isStarted]);
+  }, []);
   const onResults = (results: any) => {
-    const canvasCtx = canvasRef.current?.getContext('2d');
-    if (!canvasCtx || !canvasRef.current || !videoRef.current) return;
-
-    const width = canvasRef.current.width;
-    const height = canvasRef.current.height;
-
-    canvasCtx.save();
-    canvasCtx.clearRect(0, 0, width, height);
-
-    // Flip horizonally to mirror
-    canvasCtx.translate(width, 0);
-    canvasCtx.scale(-1, 1);
-
-    // Draw Video feed onto canvas
-    canvasCtx.drawImage(results.image, 0, 0, width, height);
-
-    // MediaPipe overlays (Classic Python Styling)
-    if (results.faceLandmarks) {
-      window.drawConnectors(canvasCtx, results.faceLandmarks, window.FACEMESH_RIGHT_EYEBROW, { color: '#FF3030', lineWidth: 1.5 }); // Rojo
-      window.drawConnectors(canvasCtx, results.faceLandmarks, window.FACEMESH_RIGHT_EYE, { color: '#FF3030', lineWidth: 1.5 });
-      window.drawConnectors(canvasCtx, results.faceLandmarks, window.FACEMESH_LEFT_EYEBROW, { color: '#30FF30', lineWidth: 1.5 }); // Verde
-      window.drawConnectors(canvasCtx, results.faceLandmarks, window.FACEMESH_LEFT_EYE, { color: '#30FF30', lineWidth: 1.5 });
-      window.drawConnectors(canvasCtx, results.faceLandmarks, window.FACEMESH_FACE_OVAL, { color: '#E0E0E0', lineWidth: 1.5 }); // Blanco
-      window.drawConnectors(canvasCtx, results.faceLandmarks, window.FACEMESH_LIPS, { color: '#E0E0E0', lineWidth: 1.5 });
-    }
-    if (results.poseLandmarks && window.POSE_CONNECTIONS) {
-      window.drawConnectors(canvasCtx, results.poseLandmarks, window.POSE_CONNECTIONS, { color: '#E0E0E0', lineWidth: 2 });
-      window.drawLandmarks(canvasCtx, results.poseLandmarks, { color: '#00FFFF', lineWidth: 1, radius: 2.5 });
+    // Sincronización del primer frame detectado con PreWarmupScreen
+    if (results.faceLandmarks && !hasFirstLandmarkRef.current) {
+      hasFirstLandmarkRef.current = true;
+      setWarmupSteps(prev => prev.map(s => ({ ...s, status: 'completed', detail: '60 FPS ESTABLE' })));
+      setWarmupProgress(100);
+      setTimeout(() => {
+        setIsPreWarmupVisible(false);
+        setIsAppLoading(false);
+      }, 400);
     }
 
-    canvasCtx.restore();
+    // Optimización 60 FPS: Solo renderizar en canvas si está visible (evita decodificación masiva de 1280x720 en background)
+    const canvas = canvasRef.current;
+    if (canvas && !canvas.classList.contains('hidden') && canvas.offsetParent !== null) {
+      const canvasCtx = canvas.getContext('2d');
+      if (canvasCtx && videoRef.current) {
+        const width = canvas.width;
+        const height = canvas.height;
+
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, width, height);
+
+        // Flip horizonally to mirror
+        canvasCtx.translate(width, 0);
+        canvasCtx.scale(-1, 1);
+
+        // Draw Video feed onto canvas
+        canvasCtx.drawImage(results.image, 0, 0, width, height);
+
+        // MediaPipe overlays (Classic Python Styling)
+        if (results.faceLandmarks) {
+          window.drawConnectors?.(canvasCtx, results.faceLandmarks, window.FACEMESH_RIGHT_EYEBROW, { color: '#FF3030', lineWidth: 1.5 });
+          window.drawConnectors?.(canvasCtx, results.faceLandmarks, window.FACEMESH_RIGHT_EYE, { color: '#FF3030', lineWidth: 1.5 });
+          window.drawConnectors?.(canvasCtx, results.faceLandmarks, window.FACEMESH_LEFT_EYEBROW, { color: '#30FF30', lineWidth: 1.5 });
+          window.drawConnectors?.(canvasCtx, results.faceLandmarks, window.FACEMESH_LEFT_EYE, { color: '#30FF30', lineWidth: 1.5 });
+          window.drawConnectors?.(canvasCtx, results.faceLandmarks, window.FACEMESH_FACE_OVAL, { color: '#E0E0E0', lineWidth: 1.5 });
+          window.drawConnectors?.(canvasCtx, results.faceLandmarks, window.FACEMESH_LIPS, { color: '#E0E0E0', lineWidth: 1.5 });
+        }
+        if (results.poseLandmarks && window.POSE_CONNECTIONS) {
+          window.drawConnectors?.(canvasCtx, results.poseLandmarks, window.POSE_CONNECTIONS, { color: '#E0E0E0', lineWidth: 2 });
+          window.drawLandmarks?.(canvasCtx, results.poseLandmarks, { color: '#00FFFF', lineWidth: 1, radius: 2.5 });
+        }
+
+        canvasCtx.restore();
+      }
+    }
 
     if (isPausedRef.current) {
       if (statusRef.current) {
@@ -1363,13 +1560,43 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       metrics.nivel_clap = Math.max(5, Math.min(100, metrics.nivel_clap * 0.94 + targetFocus * 0.06));
       metrics.nivel_carga = Math.max(0, Math.min(100, metrics.nivel_carga * 0.94 + targetLoad * 0.06));
 
-      if (displayedClassRef.current === 1 || displayedClassRef.current === 0) {
-        setMascotExpression('happy');
-      } else if (displayedClassRef.current === 3 || displayedClassRef.current === 5) {
-        setMascotExpression('blink');
-      } else {
-        setMascotExpression('normal');
+      // Paso 3: Enrutamiento de Telemetría Biocognitiva en Vivo a FocusBud (60 FPS, Latencia Cero)
+      const pupilShiftX = (pI && outerEye && innerEye)
+        ? ((pI.x - (outerEye.x + innerEye.x) / 2) / (Math.abs(outerEye.x - innerEye.x) || 1)) * 4.0
+        : 0;
+      const headYaw = (yawRatio - 0.5) * 3.8;
+      const gazeXNorm = Math.max(-1, Math.min(1, headYaw + pupilShiftX * 0.35));
+      const gazeYNorm = Math.max(-1, Math.min(1, (pitchRatio - 0.46) * 3.8));
+      const userBlinking = EAR < 0.19 || (metrics.baseline_ear > 0 && EAR < metrics.baseline_ear * 0.72);
+      const isFlowActive = displayedClassRef.current === 1 || aiResult.focusScore >= 78;
+      const isFatigueActive = displayedClassRef.current === 3 || MAR > 0.38;
+      const isDistressActive = displayedClassRef.current === 5 || distressPosture || metrics.nivel_carga > 60;
+
+
+      avatarBridge.emitBiometricFeed({
+        gazeX: gazeXNorm,
+        gazeY: gazeYNorm,
+        headRoll: rollAngle,
+        isBlinking: userBlinking,
+        isFlow: isFlowActive,
+        isFatigue: isFatigueActive,
+        isDistress: isDistressActive,
+        ear: EAR,
+        focusScore: Math.round(metrics.nivel_clap),
+      });
+
+      const nextExpr = (displayedClassRef.current === 1 || displayedClassRef.current === 0)
+        ? 'happy'
+        : (displayedClassRef.current === 3 || displayedClassRef.current === 5)
+          ? 'blink'
+          : 'normal';
+      if (mascotExpressionRef.current !== nextExpr) {
+        mascotExpressionRef.current = nextExpr;
+        setMascotExpression(nextExpr as any);
       }
+
+
+
 
       // Subdivisión autónoma de tarea si la Red Neuronal detecta que el enfoque cayó bajo 40%
       if (metrics.nivel_clap < 40 && !metrics.is_subdividing && !metrics.subdivided_indexes.includes(currentStepIdxRef.current)) {
@@ -1408,8 +1635,15 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         fatigueEventsCountRef.current += 1;
 
         isBudStreamingRef.current = true;
-        setBudMessage("");
         let streamAccumulator = "";
+
+        // Calcular severidad de la señal biométrica para adaptar la duración y cadencia de la voz (3 a 8 segundos)
+        const severity = Math.max(
+          Math.round(pFatiga * 100),
+          Math.round(pAgobio * 100),
+          Math.round(aiResult.perclos * 2.5),
+          Math.round(metrics.nivel_carga)
+        );
 
         streamMuseSparkIntervention(
           {
@@ -1422,18 +1656,68 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           },
           (chunk: string) => {
             streamAccumulator += chunk;
-            setBudMessage(streamAccumulator);
           },
           () => {
-            if (streamAccumulator.trim()) {
-              setChatMessages(prev => [...prev, {
-                role: 'assistant',
-                content: `🤖 [FocusBud / Muse Spark]: ${streamAccumulator.trim()}`
-              }]);
+            let fullText = streamAccumulator.trim();
+            // Sanitización estricta: purgar razonamiento interno en inglés si existiera
+            fullText = fullText.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#"`]/g, '').trim();
+            if (/Starts with|Need to consider|We should|Count:|PERCLOS|User prompt/i.test(fullText)) {
+              fullText = "";
             }
+
+            // Micro-resumen verbal empático adaptado a la magnitud de la señal (3 a 8 segundos de voz)
+            let voiceSummary = "";
+            let speechRate = 0.95;
+
+            if (severity >= 70 || pFatiga > 0.65) {
+              // Señal grande de fatiga: voz pausada (~6-8s)
+              voiceSummary = "Detecto sobrecarga en tu ritmo. Cierra los ojos y respira hondo cinco segundos.";
+              speechRate = 0.88;
+            } else if (pAgobio > 0.65) {
+              // Agobio: voz calmante (~5-6s)
+              voiceSummary = "Cero agobio. Respira hondo y da un solo clic a la vez.";
+              speechRate = 0.90;
+            } else if (metrics.nivel_carga > 45) {
+              // Tensión postural: voz ágil (~3-4s)
+              voiceSummary = "Ajusta tu postura: eleva el mentón y relaja los hombros.";
+              speechRate = 1.0;
+            } else {
+              voiceSummary = fullText || "Mantenemos el ritmo. Un paso a la vez.";
+              speechRate = 0.95;
+            }
+
+            // Si el texto de la IA es una frase limpia de menos de 12 palabras, usarla
+            const wordsCount = fullText.split(/\s+/).filter(Boolean).length;
+            if (fullText && wordsCount <= 12 && !/Starts with|Need to consider/i.test(fullText)) {
+              voiceSummary = fullText;
+            }
+
+            // 1. Mostrar micro-resumen en el bocadillo de FocusBud (resumido, no empuja el avatar)
+            setBudMessage(voiceSummary);
+
+            // 2. Colocar el consejo completo en el Chat de Asistencia
+            setChatMessages(prev => [...prev, {
+              role: 'assistant',
+              content: `🤖 [FocusBud / Muse Spark]: ${fullText || voiceSummary}`
+            }]);
+
+            // 3. Sintetizar la voz en vivo con Web Speech API (3 a 8 segundos)
+            audioService.speak(voiceSummary, {
+              rate: speechRate,
+              pitch: 1.08,
+              onStart: () => setIsBudSpeaking(true),
+              onEnd: () => {
+                setIsBudSpeaking(false);
+                // Desvanecer el bocadillo tras 2.5s de concluir la voz para mantener limpia la interfaz
+                setTimeout(() => {
+                  setBudMessage("");
+                }, 2500);
+              }
+            });
+
             setTimeout(() => {
               isBudStreamingRef.current = false;
-            }, 8000);
+            }, 6000);
           }
         );
       }
@@ -1443,7 +1727,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       statusBg = stabilizedResult.badgeBg;
       statusBorder = stabilizedResult.badgeBorder;
     } else {
-      statusMsg = "PDEF INACTIVO: ROSTRO NO DETECTADO";
+      statusMsg = "ROSTRO FUERA DE ENCUADRE";
       statusColor = "text-zinc-600";
       statusBg = "bg-zinc-800/10";
       statusBorder = "border-zinc-800/30";
@@ -1481,7 +1765,9 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         role: 'assistant',
         content: '🔄 Re-iniciando sensores biométricos. Por favor, mantén una postura cómoda y rostro neutral durante 15 segundos para la recalibración.'
       }]);
+      speakFocusBud("Recalibrando sensores. Mantén rostro neutral y postura cómoda durante quince segundos.", { force: true, rate: 0.98 });
     }
+
   };
 
   const handleAcceptProposal = () => {
@@ -1508,8 +1794,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
   const handleNextStep = () => {
     if (currentStepIdx < steps.length) {
+      const completedStepText = steps[currentStepIdx] || '';
       stepDistractionsRef.current = 0;
-      setCurrentStepIdx(c => c + 1);
+      const nextIdx = currentStepIdx + 1;
+      setCurrentStepIdx(nextIdx);
       metricsRef.current.nivel_clap = 100; // Dopamine CLAP boost
       metricsRef.current.nivel_carga = Math.max(0, metricsRef.current.nivel_carga - 30); // Less stress
 
@@ -1518,18 +1806,41 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         clearTimeout(rewardTimeoutRef.current);
       }
 
-      // Trigger Kawaii Reward
-      if (currentStepIdx + 1 < steps.length) {
-        const randomKao = KAOMOJIS[Math.floor(Math.random() * KAOMOJIS.length)];
-        setRewardKaomoji(randomKao);
-        setIsShowingReward(true);
-        rewardTimeoutRef.current = window.setTimeout(() => {
-          setIsShowingReward(false);
-          rewardTimeoutRef.current = null;
-        }, 2000);
+      // Trigger Kawaii Anime Reward Celebration (Rotación variada de 10 arquetipos)
+      const nextArchetype = nextIdx >= steps.length 
+        ? 5 // APEX VICTORY (¡DOMINIO TOTAL! 👑 ＼(＾▽＾)／ 👑) en el paso final
+        : Math.floor(Math.random() * REWARD_ARCHETYPES.length);
+      setRewardArchetypeIdx(nextArchetype);
+      const selectedKao = REWARD_ARCHETYPES[nextArchetype].kaomoji;
+      setRewardKaomoji(selectedKao);
+      setIsShowingReward(true);
+      audioService.playStateSound('CELEBRACION');
+      rewardTimeoutRef.current = window.setTimeout(() => {
+        setIsShowingReward(false);
+        rewardTimeoutRef.current = null;
+      }, 2000);
+
+      if (nextIdx < steps.length) {
+
+        // Vocalización autónoma de FocusBud al completar el paso (3-5 segundos)
+        const nextStepText = steps[nextIdx] || '';
+        const isNextSomatic = /^PAUSA(\s+SOMÁTICA)?/i.test(nextStepText);
+        if (isNextSomatic) {
+          speakFocusBud("Paso completado. Ahora entramos en una pausa somática. Inhala profundo y relaja los hombros.", { force: true });
+        } else {
+          // Conexión dinámica con IA: FocusBud reconoce y celebra en voz alta la actividad exacta que dominaste
+          celebrateStepUniversal(completedStepText, nextStepText, task)
+            .then(aiPhrase => {
+              speakFocusBud(aiPhrase, { force: true, rate: 1.03 });
+            })
+            .catch(() => {
+              speakFocusBud("¡Paso dominado con éxito! Mantén el foco en el siguiente.", { force: true, rate: 1.02 });
+            });
+        }
       }
     }
   };
+
 
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -1724,9 +2035,8 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     );
   };
 
-  if (showSurvey && !isStarted) {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-300 flex items-center justify-center font-sans tracking-tight p-4 sm:p-6 relative overflow-hidden">
+  const renderSurveyStage = () => (
+    <div className="min-h-screen bg-zinc-950 text-zinc-300 flex items-center justify-center font-sans tracking-tight p-4 sm:p-6 relative overflow-hidden">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1834,216 +2144,89 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             </button>
           </div>
         </motion.div>
-        {renderGlobalSettings()}
       </div>
-    );
-  }
+  );
 
-  if (appStage === 'LOGIN') {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-300 flex items-center justify-center font-sans tracking-tight">
-        <AnimatePresence>
-          {isAppLoading && (
-            <motion.div
-              key="splash-screen"
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0, y: -50, transition: { duration: 0.5, ease: "easeInOut" } }}
-              className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center select-none"
-            >
-              {/* Top YouTube-style progress bar */}
-              <div className="absolute top-0 left-0 w-full h-1 bg-zinc-900">
-                <motion.div
-                  className="h-full bg-green-500 shadow-[0_0_10px_#22c55e]"
-                  style={{ width: `${loadingProgress}%` }}
-                />
-              </div>
+  const renderLoginStage = () => (
+    <GeminiHeroInput
+      task={task}
+      setTask={setTask}
+      onSubmit={handleStart}
+      isLoading={isLoading}
+      isSurveyLoading={isSurveyLoading}
+      workMode={workMode}
+      setWorkMode={setWorkMode}
+      sensitivity={sensitivity}
+      setSensitivity={setSensitivity}
+      onOpenSettings={() => setIsSettingsOpen(true)}
+      onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+    />
+  );
 
-              {/* Centered Mascot */}
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{
-                  scale: [0.8, 1.05, 1],
-                  opacity: 1,
-                  y: [0, -4, 0]
-                }}
-                transition={{
-                  scale: { duration: 0.6, ease: "easeOut" },
-                  opacity: { duration: 0.4 },
-                  y: { repeat: Infinity, duration: 4, ease: "easeInOut" }
-                }}
-                className="flex flex-col items-center gap-6"
-              >
-                <NeuroMascot expression={mascotExpression} size={130} />
+  const renderBriefingStage = () => (
+    <div className="min-h-screen bg-zinc-950 text-zinc-300 flex items-center justify-center font-sans tracking-tight p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="max-w-xl w-full p-6 sm:p-8 rounded-3xl bg-zinc-900 shadow-2xl flex flex-col gap-6"
+      >
+        <div className="flex items-center justify-between mb-2 border-b border-zinc-800 pb-4">
+          <h2 className="text-xl font-medium text-white flex items-center gap-2">
+            <BrainCircuit className="text-green-500" /> Afinando Detalles
+          </h2>
+        </div>
 
-                <div className="flex flex-col items-center gap-1.5">
-                  <span className="font-mono text-xs tracking-[0.25em] text-green-500 uppercase font-semibold animate-pulse">
-                    Conectando Enlaces...
-                  </span>
-                  <span className="font-mono text-[10px] text-zinc-600 tracking-wider">
-                    {Math.round(loadingProgress)}%
-                  </span>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full p-8 rounded-3xl bg-zinc-900 shadow-2xl"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
-              <BrainCircuit className="text-green-500 w-5 h-5" />
-            </div>
-            <h1 className="text-xl font-medium text-white tracking-tight">NeuroSynk v3.4 Web</h1>
-          </div>
-
-          <form onSubmit={handleStart} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Ingresa la tarea o proyecto de hoy:
-              </label>
-              <input
-                autoFocus
-                type="text"
-                className="w-full px-4 py-4 bg-zinc-950 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/50 text-white placeholder-zinc-700 font-mono text-sm shadow-inner"
-                placeholder="Ej. Estudiar material general"
-                value={task}
-                onChange={e => setTask(e.target.value)}
-                disabled={isLoading || isSurveyLoading}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Perfil Biométrico de Trabajo:
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setWorkMode('pantalla')}
-                  className={`p-2 rounded-xl border text-xs font-medium transition-colors ${workMode === 'pantalla' ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
-                >
-                  💻 Pantalla
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWorkMode('lectura')}
-                  className={`p-2 rounded-xl border text-xs font-medium transition-colors ${workMode === 'lectura' ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
-                >
-                  📖 Lectura/Papel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWorkMode('flexible')}
-                  className={`p-2 rounded-xl border text-xs font-medium transition-colors ${workMode === 'flexible' ? 'bg-purple-500/20 border-purple-500 text-purple-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
-                >
-                  🎨 TDAH/Flexible
-                </button>
+        <div className="flex flex-col gap-4 max-h-[40vh] overflow-y-auto pr-2">
+          {briefingMsgs.map((m, i) => (
+            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`p-4 rounded-2xl text-sm ${m.role === 'user' ? 'bg-green-500/20 text-green-100 border border-green-500/30' : 'bg-zinc-800 text-zinc-300'}`}>
+                {m.content}
               </div>
             </div>
+          ))}
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">
-                Sensibilidad de la IA (Tolerancia):
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={() => setSensitivity('estricto')} className={`p-2 rounded-xl border text-xs font-medium transition-colors ${sensitivity === 'estricto' ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>⚡ Estricto</button>
-                <button type="button" onClick={() => setSensitivity('normal')} className={`p-2 rounded-xl border text-xs font-medium transition-colors ${sensitivity === 'normal' ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>⚖️ Normal</button>
-                <button type="button" onClick={() => setSensitivity('relajado')} className={`p-2 rounded-xl border text-xs font-medium transition-colors ${sensitivity === 'relajado' ? 'bg-green-500/20 border-green-500 text-green-400' : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}>☕ Relajado</button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading || isSurveyLoading}
-              className="w-full py-4 px-4 bg-white text-black font-semibold rounded-xl hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-            >
-              {isSurveyLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  <span>Calibrando contexto...</span>
-                </>
-              ) : (
-                <>
-                  Siguiente <ArrowRight className="w-4 h-4 fill-black inline ml-1" />
-                </>
-              )}
-            </button>
-            <p className="text-xs text-center text-zinc-500 font-mono">
-              Requiere acceso a la cámara. Procesamiento biometría 100% local.
-            </p>
-          </form>
-        </motion.div>
-        {renderGlobalSettings()}
-      </div>
-    );
-  }
-
-  if (appStage === 'BRIEFING') {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-300 flex items-center justify-center font-sans tracking-tight p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-xl w-full p-6 sm:p-8 rounded-3xl bg-zinc-900 shadow-2xl flex flex-col gap-6"
-        >
-          <div className="flex items-center justify-between mb-2 border-b border-zinc-800 pb-4">
-            <h2 className="text-xl font-medium text-white flex items-center gap-2">
-              <BrainCircuit className="text-green-500" /> Afinando Detalles
-            </h2>
-          </div>
-
-          <div className="flex flex-col gap-4 max-h-[40vh] overflow-y-auto pr-2">
-            {briefingMsgs.map((m, i) => (
-              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-4 rounded-2xl text-sm ${m.role === 'user' ? 'bg-green-500/20 text-green-100 border border-green-500/30' : 'bg-zinc-800 text-zinc-300'}`}>
-                  {m.content}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={handleBriefingSend} className="flex gap-2">
-            <input
-              type="text"
-              className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-green-500"
-              placeholder="Escribe tu respuesta..."
-              value={briefingInput}
-              onChange={e => setBriefingInput(e.target.value)}
-              disabled={isLoading}
-            />
-            <button type="submit" disabled={isLoading} className="bg-zinc-800 p-3 rounded-xl hover:bg-zinc-700 transition">
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
-
-          <button
-            onClick={handleStartFocus}
+        <form onSubmit={handleBriefingSend} className="flex gap-2">
+          <input
+            type="text"
+            className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-green-500"
+            placeholder="Escribe tu respuesta..."
+            value={briefingInput}
+            onChange={e => setBriefingInput(e.target.value)}
             disabled={isLoading}
-            className="w-full mt-2 py-4 px-4 bg-white text-black font-semibold rounded-xl hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {isLoading ? (
-              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <>
-                <Play className="w-4 h-4 fill-black inline mr-1" /> Generar Pasos e Iniciar Sesión
-              </>
-            )}
+          />
+          <button type="submit" disabled={isLoading} className="bg-zinc-800 p-3 rounded-xl hover:bg-zinc-700 transition">
+            <Send className="w-4 h-4" />
           </button>
-        </motion.div>
-        {renderGlobalSettings()}
-      </div>
-    );
-  }
+        </form>
 
-  return (
+        <button
+          onClick={handleStartFocus}
+          disabled={isLoading}
+          className="w-full mt-2 py-4 px-4 bg-white text-black font-semibold rounded-xl hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {isLoading ? (
+            <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <>
+              <Play className="w-4 h-4 fill-black inline mr-1" /> Generar Pasos e Iniciar Sesión
+            </>
+          )}
+        </button>
+      </motion.div>
+    </div>
+  );
+
+  const renderFocusStage = () => (
     <div className="lg:h-screen lg:overflow-hidden bg-zinc-950 text-zinc-300 font-sans p-4 xl:p-8 flex flex-col lg:flex-row gap-6 items-stretch">
 
-      {/* LEFT PANEL: VIDEO, BIOMETRICS & CHAT */}
-      <div className="flex-1 w-full max-w-5xl flex flex-col gap-6 min-h-0">
+      {/* LEFT PANEL: VIDEO, BIOMETRICS & CHAT - Staged GPU Entrance */}
+      <motion.div
+        initial={{ opacity: 0, x: -24 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        className="flex-1 w-full max-w-5xl flex flex-col gap-6 min-h-0"
+      >
 
         {/* HUD Bars with TensorFlow.js Neural AI */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2105,16 +2288,20 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0">
           {/* FocusBud Viewport */}
           <div className="relative rounded-3xl overflow-hidden bg-zinc-950 flex-[3] flex flex-col items-center justify-center flex-1 w-full min-h-[420px] p-4 shadow-2xl border border-zinc-900">
-            {/* Hidden native video and canvas elements for background MediaPipe & TensorFlow.js */}
-            <video ref={videoRef} className="hidden" playsInline autoPlay muted />
-            <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
+
 
             {/* Protagonista Visual: FocusBud Robot con Bocadillo Empático Estilizado */}
             <div className="relative z-10 flex flex-col items-center justify-center w-full h-full my-auto py-8">
               <FocusBudWidget
                 state={currentFocusState}
                 message={budMessage}
+                isStreaming={isBudStreamingRef.current}
+                isSpeaking={isBudSpeaking}
+                isFlow={aiPrediction ? aiPrediction.classIndex === 1 : false}
+                isFatigue={aiPrediction ? aiPrediction.classIndex === 3 : false}
+                isDistress={aiPrediction ? aiPrediction.classIndex === 5 : false}
               />
+
             </div>
 
             {/* Barra Inferior: Estado de Inferencia, Postura y Botones */}
@@ -2138,7 +2325,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   className="px-2.5 py-1 rounded text-[10px] font-mono tracking-wider uppercase bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 hover:text-emerald-200 border border-emerald-800/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                   title="Simular descanso para probar ejercicios de grounding"
                 >
-                  <span>☕</span> {timerMode === 'SHORT_BREAK' || timerMode === 'LONG_BREAK' ? 'VOLVER AL ENFOQUE' : 'PROBAR GROUNDING'}
+                  <span>☕ </span> {timerMode === 'SHORT_BREAK' || timerMode === 'LONG_BREAK' ? 'VOLVER AL ENFOQUE' : 'PROBAR GROUNDING'}
                 </button>
 
                 <button
@@ -2237,43 +2424,36 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             </form>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* RIGHT PANEL: IA MENTOR DASHBOARD */}
-      <div className="w-full lg:w-[450px] shrink-0 flex flex-col gap-6 lg:h-full min-h-0">
+      {/* RIGHT PANEL: IA MENTOR DASHBOARD - Staged GPU Entrance */}
+      <motion.div
+        initial={{ opacity: 0, x: 24 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.45, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full lg:w-[450px] shrink-0 flex flex-col gap-6 lg:h-full min-h-0"
+      >
 
         <div className="bg-zinc-900 rounded-3xl flex-1 flex flex-col overflow-hidden shadow-2xl border border-zinc-900 min-h-[500px] relative">
-
-          {/* MASSIVE REWARD OVERLAY */}
-          <AnimatePresence mode="wait">
-            {isShowingReward && (
-              <motion.div
-                key="reward-overlay"
-                initial={{ opacity: 0, scale: 0.3, y: 100 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 1.5 }}
-                transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none backdrop-blur-sm bg-black/40"
-              >
-                <div className="bg-zinc-950 border-2 border-green-500 px-8 py-6 rounded-[3rem] shadow-[0_0_100px_rgba(34,197,94,0.6)] flex items-center justify-center transform -rotate-3">
-                  <span className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-200 drop-shadow-[0_0_30px_rgba(52,211,153,0.8)] whitespace-nowrap">
-                    {rewardKaomoji}
-                  </span>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Celebración Kawaii Anime Multivariada con Partículas 60 FPS */}
+          <KawaiiRewardCelebration
+            isVisible={isShowingReward}
+            archetypeIndex={rewardArchetypeIdx}
+            comboCount={currentStepIdx + 1}
+          />
 
           <div className="p-6 pb-4 bg-zinc-900 flex justify-between items-center z-10 shadow-sm shadow-black/20">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
                 <Sparkles className="w-5 h-5" />
               </div>
-              <div className="flex flex-col gap-0.5">
-                <h2 className="text-white text-lg tracking-tight font-medium flex items-center gap-2">
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <h2 className="text-white text-base sm:text-lg tracking-tight font-medium flex items-center gap-2">
                   Mentor IA Autónomo
                 </h2>
-                <p className="text-xs font-mono text-zinc-500 truncate max-w-[180px]">OBJ: {task}</p>
+                <p className="text-xs font-mono text-zinc-400 truncate max-w-[220px]" title={task}>
+                  META: <span className="text-emerald-400 font-semibold">{task || 'Sesión de Enfoque'}</span>
+                </p>
               </div>
             </div>
             {/* Timer & Pause Controls */}
@@ -2411,7 +2591,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             </div>
           </div>
 
-          <div className="p-6 flex-1 flex flex-col justify-between overflow-y-auto no-scrollbar">
+          <div className="p-4 sm:p-6 flex-1 flex flex-col justify-between overflow-y-auto custom-scrollbar">
             {timerMode === 'SHORT_BREAK' || timerMode === 'LONG_BREAK' ? (
               <GroundingBreak
                 remainingSeconds={timerSecondsLeft}
@@ -2441,97 +2621,109 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                 </div>
 
                 {/* b) Tarjeta de Acción Única */}
-                <div className="my-auto py-6 flex items-center justify-center flex-1">
-                  <AnimatePresence mode="wait">
-                    {(() => {
-                      const activeStepText = steps[currentStepIdx] || '';
-                      const isSomaticPause = /^PAUSA(\s+SOMÁTICA)?/i.test(activeStepText);
+                {/* b) Tarjeta de Acción Única */}
+                <div className="my-auto py-6 flex items-center justify-center flex-1 w-full min-h-[220px]">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.div
+                      key={`step-card-${currentStepIdx}`}
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                      className={`w-full p-6 sm:p-8 rounded-3xl backdrop-blur-sm flex flex-col items-center justify-center text-center relative group transition-all duration-300 ${
+                        /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '')
+                          ? 'bg-gradient-to-b from-amber-950/30 via-zinc-950/90 to-zinc-950 border border-amber-500/40 shadow-[0_0_35px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20'
+                          : 'bg-zinc-950/70 border border-zinc-800/80 shadow-2xl hover:border-emerald-500/30'
+                      }`}
+                    >
+                      {/^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? (
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono font-semibold uppercase tracking-wider mb-5 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                          Pausa Somática / Biorregulación
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono font-medium uppercase tracking-wider mb-5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Paso Activo
+                        </div>
+                      )}
 
-                      return (
-                        <motion.div
-                          key={currentStepIdx}
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -8 }}
-                          transition={{ duration: 0.25, ease: "easeOut" }}
-                          className={`w-full p-8 rounded-3xl backdrop-blur-sm flex flex-col items-center justify-center text-center relative group transition-all duration-300 ${
-                            isSomaticPause
-                              ? 'bg-gradient-to-b from-amber-950/30 via-zinc-950/90 to-zinc-950 border border-amber-500/40 shadow-[0_0_35px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20'
-                              : 'bg-zinc-950/70 border border-zinc-800/80 shadow-2xl hover:border-emerald-500/30'
-                          }`}
-                        >
-                          {isSomaticPause ? (
-                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono font-semibold uppercase tracking-wider mb-5 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-                              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                              Pausa Somática / Biorregulación
-                            </div>
-                          ) : (
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono font-medium uppercase tracking-wider mb-5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                              Paso Activo
-                            </div>
-                          )}
-
-                          <p className={`text-xl sm:text-2xl font-semibold leading-relaxed tracking-tight max-w-md break-words select-text ${
-                            isSomaticPause ? 'text-amber-100 font-medium' : 'text-white'
-                          }`}>
-                            {activeStepText}
-                          </p>
-                        </motion.div>
-                      );
-                    })()}
+                      <p className={`text-xl sm:text-2xl font-semibold leading-relaxed tracking-tight max-w-md break-words select-text ${
+                        /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? 'text-amber-100 font-medium' : 'text-white'
+                      }`}>
+                        {steps[currentStepIdx] || 'Cargando paso...'}
+                      </p>
+                    </motion.div>
                   </AnimatePresence>
                 </div>
 
                 {/* c) Botón de Completado */}
-                {(() => {
-                  const activeStepText = steps[currentStepIdx] || '';
-                  const isSomaticPause = /^PAUSA(\s+SOMÁTICA)?/i.test(activeStepText);
-
-                  return (
-                    <div className="pt-2">
-                      <button
-                        onClick={handleNextStep}
-                        className={`w-full py-5 font-black text-lg rounded-2xl transition-all flex items-center justify-center gap-2 relative group overflow-hidden active:scale-[0.99] cursor-pointer ${
-                          isSomaticPause
-                            ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-zinc-950 shadow-[0_0_30px_rgba(245,158,11,0.25)]'
-                            : 'bg-green-500 hover:bg-green-400 text-black shadow-[0_0_30px_rgba(34,197,94,0.2)]'
-                        }`}
-                      >
-                        {isShowingReward ? "¡VAMOS!" : isSomaticPause ? "CONCLUIR PAUSA Y CONTINUAR ▶️" : "COMPLETAR PASO"}
-                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-                      </button>
-                      <p className="text-[10px] uppercase tracking-wider font-mono text-center text-zinc-500 mt-3">
-                        {isSomaticPause ? "Respira hondo y regresa cuando estés listo" : "Pulsa para recuperar dopamina"}
-                      </p>
+                <div className="pt-2 relative">
+                  {/* Píldora de Recompensa de Dopamina y Gamificación */}
+                  <div className="flex items-center justify-center mb-2.5">
+                    <div className={`px-4 py-1.5 rounded-full border text-[11px] font-mono font-bold tracking-wider uppercase flex items-center gap-2 transition-all duration-300 ${
+                      isShowingReward
+                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 scale-105 shadow-[0_0_25px_rgba(16,185,129,0.5)]'
+                        : 'bg-zinc-950/80 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                    }`}>
+                      <Zap className={`w-3.5 h-3.5 ${isShowingReward ? 'animate-bounce text-amber-400' : 'text-emerald-400'}`} />
+                      <span>ENERGÍA +100 CLAP • DOPAMINA</span>
+                      <Sparkles className={`w-3.5 h-3.5 ${isShowingReward ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
                     </div>
-                  );
-                })()}
+                  </div>
+
+                  <button
+                    onClick={handleNextStep}
+                    className={`w-full py-4 sm:py-5 font-black text-base sm:text-lg rounded-2xl transition-all flex items-center justify-center gap-2 relative group overflow-hidden active:scale-[0.99] cursor-pointer ${
+                      isShowingReward
+                        ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 text-zinc-950 shadow-[0_0_40px_rgba(52,211,153,0.5)] scale-[1.02]'
+                        : /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '')
+                        ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-zinc-950 shadow-[0_0_30px_rgba(245,158,11,0.25)]'
+                        : 'bg-green-500 hover:bg-green-400 text-black shadow-[0_0_30px_rgba(34,197,94,0.25)]'
+                    }`}
+                  >
+                    {isShowingReward ? "¡VAMOS CON TODO! 🚀" : /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? "CONCLUIR PAUSA Y CONTINUAR ▶️" : "COMPLETAR PASO"}
+                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+                  </button>
+
+                  {currentStepIdx + 1 < steps.length ? (
+                    <div className="flex items-center justify-center gap-1.5 mt-2.5 text-[11px] font-mono text-zinc-400">
+                      <span className="text-zinc-500 font-semibold">SIGUIENTE:</span>
+                      <span className="truncate max-w-[280px] text-zinc-300 font-medium">
+                        {steps[currentStepIdx + 1]}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] uppercase tracking-wider font-mono text-center text-emerald-400/80 mt-2.5 font-semibold">
+                      ÚLTIMO PASO • META CASI ALCANZADA
+                    </p>
+                  )}
+                </div>
               </div>
             ) : steps.length > 0 ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="my-auto p-6 sm:p-8 rounded-3xl bg-zinc-950/90 border border-emerald-500/30 text-center flex flex-col items-center gap-4 shadow-[0_0_50px_rgba(16,185,129,0.15)] relative overflow-hidden backdrop-blur-md max-w-md mx-auto w-full"
+                className="w-full max-w-md mx-auto my-auto p-5 sm:p-6 rounded-3xl bg-zinc-950/95 border border-emerald-500/30 text-center flex flex-col items-center gap-3 shadow-[0_0_50px_rgba(16,185,129,0.15)] relative backdrop-blur-md"
               >
-                <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent pointer-events-none rounded-3xl" />
 
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-0 shadow-[0_0_25px_rgba(16,185,129,0.25)]">
-                  <Sparkles className="w-7 h-7 animate-pulse text-emerald-400" />
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-0 shadow-[0_0_25px_rgba(16,185,129,0.25)] shrink-0">
+                  <Sparkles className="w-6 h-6 animate-pulse text-emerald-400" />
                 </div>
 
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 shrink-0">
                   <h3 className="font-black text-2xl sm:text-3xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-green-300 to-teal-200">
                     ¡SESIÓN COMPLETADA!
                   </h3>
-                  <p className="text-xs sm:text-sm text-zinc-400 font-medium">
+                  <p className="text-xs sm:text-sm text-zinc-400 font-medium truncate max-w-[320px]">
                     {task || "Sesión de Trabajo"}
                   </p>
                 </div>
 
                 {/* Métricas Resumen de la Sesión */}
-                <div className="grid grid-cols-2 gap-2 w-full my-1">
+                <div className="grid grid-cols-2 gap-2 w-full my-0.5 shrink-0">
                   <div className="px-3 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 font-mono text-xs text-zinc-400 flex items-center justify-between">
                     <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-emerald-400" /> Tiempo:</span>
                     <strong className="text-white">{formatTime(elapsedTime)}</strong>
@@ -2546,9 +2738,9 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   </div>
                 </div>
 
-                {/* Tarjeta de Debriefing Cognitivo con Meta Muse Spark en Baseten */}
-                <div className="w-full text-left p-4 rounded-2xl bg-zinc-900/90 border border-purple-500/30 shadow-inner space-y-2">
-                  <div className="flex items-center justify-between">
+                {/* Tarjeta de Debriefing Cognitivo con Meta Muse Spark en Baseten con scroll interno limpio */}
+                <div className="w-full text-left p-3.5 rounded-2xl bg-zinc-900/90 border border-purple-500/30 shadow-inner space-y-1.5 max-h-36 sm:max-h-44 overflow-y-auto custom-scrollbar">
+                  <div className="flex items-center justify-between sticky top-0 bg-zinc-900/95 py-0.5 z-10 backdrop-blur-sm">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-purple-400" />
                       <span className="text-[10px] font-mono tracking-wider uppercase text-purple-300 font-bold">
@@ -2569,18 +2761,102 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   </p>
                 </div>
 
+                {/* Botón Nueva Sesión siempre visible y clickeable */}
                 <button
-                  onClick={() => window.location.reload()}
-                  className="w-full mt-1 py-3.5 px-6 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm sm:text-base rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] active:scale-[0.99] uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                  onClick={handleStartNewSession}
+                  className="w-full mt-1 py-3.5 px-6 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm sm:text-base rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] active:scale-[0.99] uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0"
                 >
                   INICIAR NUEVA SESIÓN
                 </button>
               </motion.div>
             ) : null}
+
           </div>
         </div>
-      </div>
-      {renderGlobalSettings()}
+      </motion.div>
     </div>
+  );
+
+  return (
+    <>
+      {/* Sensores de hardware permanentes (100% On-Device Zero-Latency) */}
+      <video ref={videoRef} className="hidden" playsInline autoPlay muted />
+      <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
+
+      {/* Pantalla Cinemática de Pre-Calentamiento de Hardware (Paso 1) */}
+      <PreWarmupScreen
+        isVisible={isPreWarmupVisible}
+        steps={warmupSteps}
+        progress={warmupProgress}
+        onSkip={() => {
+          setIsPreWarmupVisible(false);
+          setIsAppLoading(false);
+        }}
+      />
+
+      {/* Barra Lateral Colapsable Gemini / Android Workspace (Paso 5) */}
+      <CollapsibleSidebar
+        currentTask={task}
+        onNewSession={handleStartNewSession}
+        onSelectPastSession={handleSelectPastSession}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        apiStatus={apiStatus}
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
+        isHeroStage={appStage === 'LOGIN'}
+      />
+
+      <div className="w-full min-h-screen relative bg-zinc-950 overflow-x-hidden">
+        <AnimatePresence mode="wait">
+          {showSurvey && !isStarted ? (
+            <motion.div
+              key="stage-survey"
+              initial={{ opacity: 0, scale: 0.97, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: -16, transition: { duration: 0.25 } }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full min-h-screen"
+            >
+              {renderSurveyStage()}
+            </motion.div>
+          ) : appStage === 'LOGIN' ? (
+            <motion.div
+              key="stage-login"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -20, transition: { duration: 0.3 } }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="w-full min-h-screen"
+            >
+              {renderLoginStage()}
+            </motion.div>
+          ) : appStage === 'BRIEFING' ? (
+            <motion.div
+              key="stage-briefing"
+              initial={{ opacity: 0, scale: 0.97, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: -16, transition: { duration: 0.25 } }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full min-h-screen"
+            >
+              {renderBriefingStage()}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="stage-focus"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.25 } }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full min-h-screen"
+            >
+              {renderFocusStage()}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {renderGlobalSettings()}
+    </>
   );
 }
