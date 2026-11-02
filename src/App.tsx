@@ -11,6 +11,7 @@ import { avatarBridge } from './services/avatarBridge';
 import { GroundingBreak } from './components/GroundingBreak';
 import { GeminiHeroInput } from './components/home/GeminiHeroInput';
 import { CollapsibleSidebar, SavedSessionItem } from './components/navigation/CollapsibleSidebar';
+import { saveSessionItem } from './services/sessionHistoryService';
 import { PreWarmupScreen, WarmupStep } from './components/PreWarmupScreen';
 import {
   chatUniversal,
@@ -263,8 +264,28 @@ export default function App() {
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const currentSessionIdRef = useRef<string | null>(null);
 
   const handleStartNewSession = () => {
+    // Si la sesión anterior tuvo avance, asegurar que quede grabada en el historial
+    if (currentSessionIdRef.current && (elapsedTime > 15 || currentStepIdx > 0)) {
+      const focusHistory = focusSamplesRef.current;
+      const avgFocus = focusHistory.length > 0
+        ? Math.round(focusHistory.reduce((a, b) => a + b, 0) / focusHistory.length)
+        : Math.round(metricsRef.current.nivel_clap);
+      saveSessionItem({
+        id: currentSessionIdRef.current,
+        task: task || 'Sesión de Trabajo',
+        timestamp: Date.now(),
+        durationMinutes: Math.max(1, Math.round(elapsedTime / 60)),
+        completedSteps: currentStepIdx,
+        totalSteps: steps.length,
+        avgFocus: avgFocus,
+        status: currentStepIdx >= steps.length ? 'COMPLETADA' : 'EN_PROGRESO'
+      });
+    }
+    currentSessionIdRef.current = null;
+
     setIsStarted(false);
     setShowSurvey(false);
     setAppStage('LOGIN');
@@ -603,24 +624,19 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       }).then(res => {
         setSessionDebrief(res.debrief);
 
-        // Guardar sesión en historial local para la barra lateral
-        try {
-          const rawHistory = localStorage.getItem('neurosynk_session_history');
-          const history = rawHistory ? JSON.parse(rawHistory) : [];
-          history.unshift({
-            id: `session-${Date.now()}`,
-            task: task || 'Sesión de Trabajo',
-            timestamp: Date.now(),
-            durationMinutes: totalMins,
-            completedSteps: steps.length,
-            totalSteps: steps.length,
-            avgFocus: avgFocus,
-            debriefSummary: res.debrief
-          });
-          localStorage.setItem('neurosynk_session_history', JSON.stringify(history.slice(0, 25)));
-        } catch (storageErr) {
-          console.warn("Storage warning:", storageErr);
-        }
+        // Guardar sesión completada con debriefing en historial local
+        const finalSessionId = currentSessionIdRef.current || `session-${Date.now()}`;
+        saveSessionItem({
+          id: finalSessionId,
+          task: task || 'Sesión de Trabajo',
+          timestamp: Date.now(),
+          durationMinutes: totalMins,
+          completedSteps: steps.length,
+          totalSteps: steps.length,
+          avgFocus: avgFocus,
+          debriefSummary: res.debrief,
+          status: 'COMPLETADA'
+        });
 
         // FocusBud sintetiza el debriefing con voz empática en español (5 a 8 segundos)
         const spokenDebrief = `¡Sesión completada con éxito! Has finalizado todos los pasos de ${task || 'tu meta'}. Tu enfoque promedio fue de ${avgFocus} por ciento. ¡Excelente constancia!`;
@@ -630,23 +646,18 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         const fallback = `SESIÓN CONCLUIDA: Has completado todos los pasos de "${task}". Tu enfoque promedio fue de ${avgFocus}%. Respira hondo y felicítate por este avance tangible.`;
         setSessionDebrief(fallback);
 
-        try {
-          const rawHistory = localStorage.getItem('neurosynk_session_history');
-          const history = rawHistory ? JSON.parse(rawHistory) : [];
-          history.unshift({
-            id: `session-${Date.now()}`,
-            task: task || 'Sesión de Trabajo',
-            timestamp: Date.now(),
-            durationMinutes: totalMins,
-            completedSteps: steps.length,
-            totalSteps: steps.length,
-            avgFocus: avgFocus,
-            debriefSummary: fallback
-          });
-          localStorage.setItem('neurosynk_session_history', JSON.stringify(history.slice(0, 25)));
-        } catch (storageErr) {
-          console.warn("Storage warning:", storageErr);
-        }
+        const finalSessionId = currentSessionIdRef.current || `session-${Date.now()}`;
+        saveSessionItem({
+          id: finalSessionId,
+          task: task || 'Sesión de Trabajo',
+          timestamp: Date.now(),
+          durationMinutes: totalMins,
+          completedSteps: steps.length,
+          totalSteps: steps.length,
+          avgFocus: avgFocus,
+          debriefSummary: fallback,
+          status: 'COMPLETADA'
+        });
 
         const spokenFallback = `¡Sesión terminada! Buen trabajo con todos tus pasos. Descansa la mente y estira un poco.`;
         speakFocusBud(spokenFallback, { force: true, rate: 0.98 });
@@ -909,6 +920,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
   const handleGenerateFromSurvey = async (useAnswers: boolean = true) => {
     setIsLoading(true);
     const answersToSend = useAnswers ? surveyAnswers : {};
+    let resolvedSteps: string[] = [];
 
     try {
       const data = await splitTaskUniversal(
@@ -919,20 +931,21 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       );
 
       if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
-        const cleanSteps = data.steps.map((s: string) => s.replace(/(Paso \d+:)/i, '').trim());
-        setSteps(cleanSteps);
+        resolvedSteps = data.steps.map((s: string) => s.replace(/(Paso \d+:)/i, '').trim());
       } else {
         throw new Error("Formato de respuesta incorrecto");
       }
     } catch (err) {
       console.error("Error al generar ruta de trabajo:", err);
-      setSteps([
+      resolvedSteps = [
         `DELIMITA el objetivo y alcance principal de '${task}'.`,
         `ORGANIZA los materiales o fuentes indispensables para arrancar.`,
         `DESARROLLA el primer bloque central con enfoque total.`,
         `REVISA y consolida el avance realizado.`
-      ]);
+      ];
     } finally {
+      setSteps(resolvedSteps);
+
       // Sincronización con la Encuesta de Duración (surveyAnswers.q1)
       const q1Ans = surveyAnswers.q1 || '';
       let wDur = 25 * 60;
@@ -966,6 +979,20 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       setShowSurvey(false);
       setIsStarted(true);
       setAppStage('FOCUS');
+
+      // Iniciar y registrar la nueva sesión en el historial local
+      const sId = `session-${Date.now()}`;
+      currentSessionIdRef.current = sId;
+      saveSessionItem({
+        id: sId,
+        task: task || 'Sesión de Trabajo',
+        timestamp: Date.now(),
+        durationMinutes: 0,
+        completedSteps: 0,
+        totalSteps: resolvedSteps.length,
+        avgFocus: 100,
+        status: 'EN_PROGRESO'
+      });
     }
   };
 
@@ -1000,6 +1027,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
   const handleStartFocus = async () => {
     setIsLoading(true);
     const contextStr = briefingMsgs.map(m => `${m.role === 'user' ? 'Usuario' : 'IA'}: ${m.content}`).join('\n');
+    let resolvedSteps: string[] = [];
 
     try {
       const data = await splitTaskUniversal(
@@ -1009,15 +1037,15 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         geminiApiKey
       );
 
-      if (data.steps && Array.isArray(data.steps)) {
-        const cleanSteps = data.steps.map((s: string) => s.replace(/(Paso \d+:)/i, '').trim());
-        setSteps(cleanSteps);
+      if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
+        resolvedSteps = data.steps.map((s: string) => s.replace(/(Paso \d+:)/i, '').trim());
       } else {
         throw new Error("Formato de respuesta incorrecto");
       }
     } catch (err) {
-      setSteps(['Preparar material', 'Iniciar primera fase', 'Revisar progreso', 'Finalizar']);
+      resolvedSteps = ['Preparar material', 'Iniciar primera fase', 'Revisar progreso', 'Finalizar'];
     } finally {
+      setSteps(resolvedSteps);
       setIsTimerRunning(true);
       setTimerSecondsLeft(workDuration);
       setTimerMode('WORK');
@@ -1025,6 +1053,20 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       setIsLoading(false);
       setIsStarted(true);
       setAppStage('FOCUS');
+
+      // Iniciar y registrar la nueva sesión en el historial local
+      const sId = `session-${Date.now()}`;
+      currentSessionIdRef.current = sId;
+      saveSessionItem({
+        id: sId,
+        task: task || 'Sesión de Trabajo',
+        timestamp: Date.now(),
+        durationMinutes: 0,
+        completedSteps: 0,
+        totalSteps: resolvedSteps.length,
+        avgFocus: 100,
+        status: 'EN_PROGRESO'
+      });
 
       // Bienvenida con voz autónoma de FocusBud (3-4 segundos)
       setTimeout(() => {
@@ -1792,6 +1834,25 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         setIsShowingReward(false);
         rewardTimeoutRef.current = null;
       }, 2000);
+
+      // Actualizar progreso de la sesión en el historial local en tiempo real
+      if (currentSessionIdRef.current) {
+        const focusHistory = focusSamplesRef.current;
+        const avgFocus = focusHistory.length > 0
+          ? Math.round(focusHistory.reduce((a, b) => a + b, 0) / focusHistory.length)
+          : Math.round(metricsRef.current.nivel_clap);
+        const totalMins = Math.max(1, Math.round(elapsedTime / 60));
+        saveSessionItem({
+          id: currentSessionIdRef.current,
+          task: task || 'Sesión de Trabajo',
+          timestamp: Date.now(),
+          durationMinutes: totalMins,
+          completedSteps: nextIdx,
+          totalSteps: steps.length,
+          avgFocus,
+          status: nextIdx >= steps.length ? 'COMPLETADA' : 'EN_PROGRESO'
+        });
+      }
 
       if (nextIdx < steps.length) {
 

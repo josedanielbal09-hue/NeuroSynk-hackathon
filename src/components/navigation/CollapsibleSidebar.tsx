@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
   PanelLeftClose,
-  PanelLeft,
   Clock,
   Sparkles,
   Settings,
@@ -13,19 +12,22 @@ import {
   User,
   RotateCcw,
   X,
-  Menu
+  Menu,
+  Download,
+  Upload,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
+import {
+  SavedSessionItem,
+  getSessionHistory,
+  deleteSessionItem,
+  clearSessionHistory,
+  exportSessionHistory,
+  importSessionHistory
+} from '../../services/sessionHistoryService';
 
-export interface SavedSessionItem {
-  id: string;
-  task: string;
-  timestamp: number;
-  durationMinutes: number;
-  completedSteps: number;
-  totalSteps: number;
-  avgFocus: number;
-  debriefSummary?: string;
-}
+export type { SavedSessionItem };
 
 interface CollapsibleSidebarProps {
   currentTask?: string;
@@ -38,31 +40,6 @@ interface CollapsibleSidebarProps {
   isHeroStage?: boolean;
 }
 
-const STORAGE_KEY = 'neurosynk_session_history';
-
-const SEED_SESSIONS: SavedSessionItem[] = [
-  {
-    id: 'seed-1',
-    task: 'Estudio de Biología Celular y Fotosíntesis',
-    timestamp: Date.now() - 3600 * 1000 * 3,
-    durationMinutes: 48,
-    completedSteps: 6,
-    totalSteps: 6,
-    avgFocus: 88,
-    debriefSummary: 'Completaste con éxito los 6 pasos. Gran retención en el ciclo de Calvin y disipación de fatiga oportuna.'
-  },
-  {
-    id: 'seed-2',
-    task: 'Diseño de Arquitectura y Shaders WebGL',
-    timestamp: Date.now() - 3600 * 1000 * 24,
-    durationMinutes: 35,
-    completedSteps: 4,
-    totalSteps: 5,
-    avgFocus: 82,
-    debriefSummary: 'Sprint productivo. Estructuraste los tensores y mantuviste postura erguida el 85% del tiempo.'
-  }
-];
-
 export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   currentTask,
   onNewSession,
@@ -73,19 +50,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   setIsOpen,
   isHeroStage = false
 }) => {
-  const [sessions, setSessions] = useState<SavedSessionItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.warn('Failed to load session history:', e);
-    }
-    return SEED_SESSIONS;
-  });
-
+  const [sessions, setSessions] = useState<SavedSessionItem[]>(() => getSessionHistory());
   const [selectedSession, setSelectedSession] = useState<SavedSessionItem | null>(null);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [quickNote, setQuickNote] = useState(() => {
@@ -95,21 +60,60 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       return '';
     }
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Recargar historial cada vez que se abre la barra lateral
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-    } catch (e) {
-      console.warn('Storage error:', e);
+    if (isOpen) {
+      setSessions(getSessionHistory());
     }
-  }, [sessions]);
+  }, [isOpen]);
+
+  // Escuchar eventos globales de sincronización en tiempo real
+  useEffect(() => {
+    const handleUpdate = () => {
+      setSessions(getSessionHistory());
+    };
+    window.addEventListener('neurosynk_session_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('neurosynk_session_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
 
   const handleDeleteSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    deleteSessionItem(id);
     setSessions(prev => prev.filter(s => s.id !== id));
     if (selectedSession?.id === id) {
       setSelectedSession(null);
     }
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm('¿Deseas vaciar todo el historial de sesiones de esta computadora? Esta acción no se puede deshacer.')) {
+      clearSessionHistory();
+      setSessions([]);
+      setSelectedSession(null);
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = event => {
+      const content = event.target?.result as string;
+      if (content && importSessionHistory(content)) {
+        setSessions(getSessionHistory());
+        alert('¡Historial importado con éxito!');
+      } else {
+        alert('El archivo no tiene un formato JSON válido de NeuroSynk.');
+      }
+    };
+    reader.readAsText(file);
+    if (e.target) e.target.value = '';
   };
 
   const handleSaveNote = (text: string) => {
@@ -122,17 +126,27 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   };
 
   const formatRelativeTime = (ts: number): string => {
-    const diffHours = Math.round((Date.now() - ts) / (1000 * 3600));
-    if (diffHours < 1) return 'Hace un momento';
+    const diffMins = Math.round((Date.now() - ts) / (1000 * 60));
+    if (diffMins < 1) return 'Hace un momento';
+    if (diffMins < 60) return `Hace ${diffMins}m`;
+    const diffHours = Math.round(diffMins / 60);
     if (diffHours < 24) return `Hoy hace ${diffHours}h`;
     const days = Math.round(diffHours / 24);
     if (days === 1) return 'Ayer';
-    return `Hace ${days} días`;
+    return `Hace ${days}d`;
   };
 
   return (
     <>
-      {/* Persistent Floating Toggle Trigger (top-left) when closed and not on hero stage */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={handleImportFile}
+      />
+
+      {/* Floating Toggle Trigger */}
       {!isOpen && !isHeroStage && (
         <button
           type="button"
@@ -144,10 +158,13 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           <span className="hidden sm:inline font-mono text-[11px] font-medium text-zinc-400 group-hover:text-zinc-200">
             Menú
           </span>
+          {sessions.length > 0 && (
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          )}
         </button>
       )}
 
-      {/* Backdrop overlay for drawer */}
+      {/* Backdrop */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -161,13 +178,13 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Hardware-Accelerated Sliding Drawer (GPU Translate, 0 Layout Thrashing) */}
+      {/* Drawer */}
       <aside
         style={{
           transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
           willChange: 'transform'
         }}
-        className="fixed top-0 left-0 bottom-0 z-50 w-72 sm:w-80 bg-zinc-950 border-r border-zinc-800/90 shadow-[20px_0_60px_rgba(0,0,0,0.8)] flex flex-col justify-between select-none overflow-hidden transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="fixed top-0 left-0 bottom-0 z-50 w-72 sm:w-84 bg-zinc-950 border-r border-zinc-800/90 shadow-[20px_0_60px_rgba(0,0,0,0.8)] flex flex-col justify-between select-none overflow-hidden transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
       >
         {/* TOP SECTION: Header & Actions */}
         <div className="flex flex-col p-4 gap-3 shrink-0 border-b border-zinc-900/80">
@@ -181,7 +198,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   NeuroSynk
                 </span>
                 <span className="text-[10px] text-zinc-500 font-mono tracking-wider whitespace-nowrap mt-0.5">
-                  Workspace
+                  Local Workspace
                 </span>
               </div>
             </div>
@@ -219,36 +236,46 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           <div className="space-y-1.5">
             <div className="px-2 py-1 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
               <span className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-zinc-400" /> Sesiones Recientes
+                <Clock className="w-3.5 h-3.5 text-zinc-400" /> Sesiones Guardadas
               </span>
-              <span className="text-[10px] text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded-md">
+              <span className="text-[10px] text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-800 font-mono">
                 {sessions.length}
               </span>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {sessions.map(item => {
                 const isSelected = selectedSession?.id === item.id;
+                const isCompleted = item.status === 'COMPLETADA' || (item.completedSteps >= item.totalSteps && item.totalSteps > 0);
+
                 return (
                   <div
                     key={item.id}
                     onClick={() => setSelectedSession(item)}
                     className={`group relative flex items-center justify-between p-3 rounded-xl transition-all cursor-pointer border ${
                       isSelected
-                        ? 'bg-zinc-900 border-emerald-500/40 text-emerald-300 shadow-md'
-                        : 'bg-zinc-950/60 hover:bg-zinc-900/90 border-zinc-900 hover:border-zinc-800 text-zinc-300'
+                        ? 'bg-zinc-900 border-emerald-500/50 text-emerald-300 shadow-md'
+                        : 'bg-zinc-950/70 hover:bg-zinc-900/90 border-zinc-900 hover:border-zinc-800 text-zinc-300'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${
+                        isCompleted
+                          ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]'
+                          : 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.7)]'
+                      }`} />
                       <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-xs font-medium truncate text-zinc-200 group-hover:text-white whitespace-nowrap">
+                        <span className="text-xs font-medium truncate text-zinc-200 group-hover:text-white">
                           {item.task}
                         </span>
-                        <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 mt-0.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 mt-0.5">
                           <span>{formatRelativeTime(item.timestamp)}</span>
                           <span>•</span>
-                          <span className="text-emerald-400 font-semibold">{item.avgFocus}% Foco</span>
+                          <span className={isCompleted ? 'text-emerald-400' : 'text-amber-400'}>
+                            {item.completedSteps}/{item.totalSteps} pasos
+                          </span>
+                          <span>•</span>
+                          <span className="text-cyan-400 font-medium">{item.avgFocus}% Foco</span>
                         </div>
                       </div>
                     </div>
@@ -266,8 +293,9 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               })}
 
               {sessions.length === 0 && (
-                <div className="p-4 text-center text-xs text-zinc-600 italic bg-zinc-900/40 rounded-xl border border-zinc-900">
-                  Sin sesiones grabadas aún.
+                <div className="p-4 text-center text-xs text-zinc-500 bg-zinc-900/30 rounded-xl border border-zinc-900/80 space-y-1">
+                  <p className="font-semibold text-zinc-400">Sin sesiones grabadas aún</p>
+                  <p className="text-[11px] text-zinc-600">Cada sesión que inicies se guardará automáticamente en tu computadora.</p>
                 </div>
               )}
             </div>
@@ -276,7 +304,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           {/* Tools Hub */}
           <div className="space-y-1.5 pt-3 border-t border-zinc-900">
             <div className="px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
-              Herramientas
+              Herramientas & Datos
             </div>
 
             <button
@@ -303,6 +331,44 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               </div>
               <span className="whitespace-nowrap">Ajustes & Enlace IA</span>
             </button>
+
+            <button
+              type="button"
+              onClick={exportSessionHistory}
+              disabled={sessions.length === 0}
+              className="w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900/90 disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer border border-transparent hover:border-zinc-800"
+              title="Descargar copia de seguridad en JSON"
+            >
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+              </div>
+              <span className="whitespace-nowrap">Exportar Registros (JSON)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900/90 transition-colors cursor-pointer border border-transparent hover:border-zinc-800"
+              title="Restaurar registros desde archivo JSON"
+            >
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                <Upload className="w-3.5 h-3.5 text-blue-400" />
+              </div>
+              <span className="whitespace-nowrap">Importar Registros</span>
+            </button>
+
+            {sessions.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="w-full flex items-center gap-3 p-2 rounded-xl text-[11px] font-medium text-zinc-500 hover:text-rose-400 hover:bg-zinc-900/50 transition-colors cursor-pointer"
+              >
+                <div className="w-7 h-7 rounded-lg bg-zinc-900 flex items-center justify-center shrink-0 text-zinc-500">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </div>
+                <span>Limpiar Historial Local</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -320,7 +386,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               </span>
             </div>
             <span className="text-[9px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 font-semibold uppercase">
-              60 FPS
+              100% On-Device
             </span>
           </div>
 
@@ -333,7 +399,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 Usuario Focus
               </span>
               <span className="text-[10px] text-zinc-500 font-mono truncate whitespace-nowrap">
-                GPU On-Device
+                Base Local Privada
               </span>
             </div>
           </div>
@@ -363,7 +429,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   <div>
                     <h3 className="text-white font-semibold text-sm">Resumen de Sesión</h3>
                     <p className="text-[11px] font-mono text-zinc-500">
-                      {new Date(selectedSession.timestamp).toLocaleDateString()}
+                      {new Date(selectedSession.timestamp).toLocaleDateString()} • {new Date(selectedSession.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
@@ -419,7 +485,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   }}
                   className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs rounded-xl transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" /> Repetir / Continuar
+                  <RotateCcw className="w-3.5 h-3.5" /> Reanudar / Repetir
                 </button>
                 <button
                   type="button"
