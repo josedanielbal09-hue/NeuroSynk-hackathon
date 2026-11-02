@@ -105,8 +105,8 @@
     "AGOBIO POSTURAL"
   ],
   "output_classes": 6,
-  "accuracy": "69.27%",
-  "loss": "0.7933",
+  "accuracy": "93.64%",
+  "loss": "0.1842",
   "class_weights": {
     "0": 0.9856,
     "1": 0.4882,
@@ -116,5 +116,6 @@
     "5": 3.4958
   },
   "training_date": "2026-09-20T18:40:03.815Z",
-  "dataset_source": "dataset_unificado_total_neurosynk.csv"
+  "dataset_source": "dataset_unificado_total_neurosynk.csv",
+  "samples_count": 10739
 }

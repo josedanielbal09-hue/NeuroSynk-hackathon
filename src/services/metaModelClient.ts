@@ -436,13 +436,16 @@ export async function decomposeWithMuseWonder(
  * NUNCA envía video ni imágenes del usuario fuera del dispositivo.
  */
 export async function calibrateErgonomicsWithSAM(
-  _optionalImageSnapshot?: string
+  telemetryOrSnapshot?: string | { rollAngle?: number; shoulderAngle?: number; pitchAngle?: number; stressLevel?: number }
 ): Promise<MetaSAMCalibrationResult> {
+  const payload = typeof telemetryOrSnapshot === 'object' && telemetryOrSnapshot !== null
+    ? telemetryOrSnapshot
+    : {};
   try {
     const response = await fetch('/api/meta/sam/calibrate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify(payload)
     });
 
     if (response.ok) {
