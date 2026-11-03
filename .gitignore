@@ -1,7 +1,6 @@
 # Dependencies & Build
 node_modules/
 build/
-dist/
 coverage/
 .vite/
 .DS_Store
