@@ -2020,7 +2020,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
                   {/* Options as pill/card buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:pl-9">
-                    {q.options.map((opt, oIdx) => {
+                    {(Array.isArray(q.options) ? q.options : ["Opción A", "Opción B", "Opción C"]).map((opt, oIdx) => {
                       const isSelected = selectedOption === opt;
                       return (
                         <button

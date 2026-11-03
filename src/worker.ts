@@ -34,10 +34,12 @@ async function callAIModel(
   env: Env,
   request?: Request,
   temperature: number = 0.7,
-  maxTokens: number = 420
+  maxTokens: number = 800
 ): Promise<string> {
   const basetenKey = getEffectiveBasetenKey(env, request);
-  const effectiveMaxTokens = Math.max(80, Math.min(maxTokens, 800));
+  // Meta Muse Spark Open uses internal reasoning_tokens (~140-220 tokens) before emitting content,
+  // so max_tokens must always be >= 500 to avoid finish_reason="length" with empty content.
+  const effectiveMaxTokens = Math.max(500, Math.min(maxTokens, 950));
 
   // Exclusive call to Baseten (Meta Muse Spark Open)
   if (basetenKey) {
@@ -121,12 +123,19 @@ export default {
 Diseña una encuesta de calibración rápida de 5 preguntas breves y específicas sobre la meta del usuario: "${task}".
 Cada pregunta debe tener exactamente 3 opciones concretas.
 Responde ÚNICAMENTE con un objeto JSON válido con la clave "questions": array de 5 objetos { "id": "q1".."q5", "question": string, "options": string[3] }.`;
-          const text = await callAIModel(`Meta: "${task}"`, sys, env, request);
+          const text = await callAIModel(`Meta: "${task}"`, sys, env, request, 0.7, 750);
           const match = text.match(/\{[\s\S]*\}/);
           if (match) {
             const data = JSON.parse(match[0]);
             if (Array.isArray(data.questions) && data.questions.length >= 3) {
-              return Response.json({ questions: data.questions }, { headers: CORS_HEADERS });
+              const sanitized = data.questions.map((q: any, i: number) => ({
+                id: q.id || `q${i + 1}`,
+                question: String(q.question || "Pregunta de calibración"),
+                options: Array.isArray(q.options) && q.options.length >= 2
+                  ? q.options.map(String)
+                  : ["Opción A", "Opción B", "Opción C"]
+              }));
+              return Response.json({ questions: sanitized }, { headers: CORS_HEADERS });
             }
           }
         } catch (e) {
@@ -203,7 +212,7 @@ REGLAS OBLIGATORIAS:
           const sys = `Eres FocusBud de NeuroSynk. El usuario acaba de completar un micropaso.
 Formula una frase breve, entusiasta, humana y motivadora (máximo 12 palabras) que reconozca la acción dominada.
 Sin comillas, sin asteriscos. En español.`;
-          const text = await callAIModel(`Paso completado: "${completed}"`, sys, env, request, 0.8, 80);
+          const text = await callAIModel(`Paso completado: "${completed}"`, sys, env, request, 0.8, 550);
           const cleanText = text.replace(/["*]/g, '').trim();
           if (cleanText.length > 5) {
             return Response.json({ phrase: cleanText }, { headers: CORS_HEADERS });
@@ -309,7 +318,7 @@ Responde ÚNICAMENTE con un JSON con las claves "nanoSteps" (array de 3 strings)
 Métricas biométricas actuales: PERCLOS: ${payload.perclos || 0}%, Fatiga: ${payload.fatigueScore || 0}%, Tensión postural: ${payload.postureScore || 0}%, Estado: ${payload.cognitiveClass || 'Estudio'}.
 Genera una intervención verbal empática y directa (máximo 12 palabras) iniciando con un VERBO EN MAYÚSCULAS para guiar su atención o postura.
 Sin comillas ni explicaciones en inglés.`;
-          const text = await callAIModel("Intervención breve", sys, env, request, 0.7, 100);
+          const text = await callAIModel("Intervención breve", sys, env, request, 0.7, 550);
           const clean = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#"`]/g, '').trim();
           if (clean.length > 5 && !/Starts with|Need to consider/i.test(clean)) {
             reply = clean;
@@ -382,7 +391,7 @@ Sin formatos complejos ni listas largas.`;
           }
 
           const prompt = `Pregunta del usuario: "${message}"`;
-          const text = await callAIModel(prompt, sys, env, request, 0.7, 150);
+          const text = await callAIModel(prompt, sys, env, request, 0.7, 600);
           const cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#]/g, '').trim();
           if (cleanText.length > 3) {
             return Response.json({ reply: cleanText }, { headers: CORS_HEADERS });
@@ -411,7 +420,7 @@ Sin formatos complejos ni listas largas.`;
 
         try {
           const sys = `Eres el Mentor de NeuroSynk. Redacta un debriefing de cierre conciso (máximo 45 palabras) con balance de ritmo, pasos concluidos y recomendación somática de descanso.`;
-          const text = await callAIModel(`Tarea: "${task}", Pasos: ${completed}/${total}, Foco promedio: ${focus}%`, sys, env, request, 0.7, 150);
+          const text = await callAIModel(`Tarea: "${task}", Pasos: ${completed}/${total}, Foco promedio: ${focus}%`, sys, env, request, 0.7, 600);
           const cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#]/g, '').trim();
           if (cleanText.length > 10) {
             return Response.json({ debrief: cleanText }, { headers: CORS_HEADERS });

@@ -125,7 +125,9 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
   if (BASETEN_API_KEY) {
     try {
       const basetenUrl = process.env.BASETEN_ENDPOINT_URL || "https://inference.baseten.co/v1/chat/completions";
-      const tokenBudget = Math.max(80, Math.min(params.maxTokens ?? 450, 900));
+      // Meta Muse Spark Open uses ~140-220 internal reasoning_tokens before emitting content,
+      // so tokenBudget must always be >= 500 to prevent finish_reason="length" with empty content.
+      const tokenBudget = Math.max(500, Math.min(params.maxTokens ?? 750, 950));
       const basetenRes = await fetchWithRetry(basetenUrl, {
         method: "POST",
         headers: {
@@ -254,13 +256,20 @@ Responde estrictamente con un JSON con la clave "questions": array de objetos co
       apiKeyOverride: headerKey
     });
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[0]);
-      if (data.questions && Array.isArray(data.questions)) {
-        res.json({ questions: data.questions });
-        return;
-      }
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const data = JSON.parse(jsonMatch[0]);
+      if (data.questions && Array.isArray(data.questions)) {
+        const sanitized = data.questions.map((q: any, i: number) => ({
+          id: q.id || `q${i + 1}`,
+          question: String(q.question || "Pregunta de calibración"),
+          options: Array.isArray(q.options) && q.options.length >= 2
+            ? q.options.map(String)
+            : ["Opción A", "Opción B", "Opción C"]
+        }));
+        res.json({ questions: sanitized });
+        return;
+      }
     }
   } catch (error: any) {
     console.warn("[Task Survey] Using adaptive fallback:", error?.cause?.message || error?.message || error);
