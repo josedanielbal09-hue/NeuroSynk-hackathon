@@ -30,7 +30,7 @@ interface MetaCallParams {
 /**
  * Robust fetch wrapper with timeout and 1-2 retries for transient socket closes (e.g. idle Keep-Alive drops)
  */
-async function fetchWithRetry(url: string, options: any, retries = 1, timeoutMs = 8000): Promise<Response> {
+async function fetchWithRetry(url: string, options: any, retries = 2, timeoutMs = 18000): Promise<Response> {
   let lastError: any = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -48,7 +48,7 @@ async function fetchWithRetry(url: string, options: any, retries = 1, timeoutMs 
       const detail = err?.cause?.message || err?.cause || err?.message || err;
       if (attempt < retries) {
         console.warn(`[Network Retry] Attempt ${attempt + 1} to ${new URL(url).host} failed (${detail}). Re-trying on fresh socket...`);
-        await new Promise(r => setTimeout(r, 250));
+        await new Promise(r => setTimeout(r, 350));
       }
     }
   }
@@ -125,9 +125,9 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
   if (BASETEN_API_KEY) {
     try {
       const basetenUrl = process.env.BASETEN_ENDPOINT_URL || "https://inference.baseten.co/v1/chat/completions";
-      // Meta Muse Spark Open uses ~140-220 internal reasoning_tokens before emitting content,
-      // so tokenBudget must always be >= 500 to prevent finish_reason="length" with empty content.
-      const tokenBudget = Math.max(500, Math.min(params.maxTokens ?? 750, 950));
+      // Meta Muse Spark Open uses 500-900 internal reasoning_tokens + output tokens,
+      // so tokenBudget MUST be >= 2048 so JSON responses are never truncated.
+      const tokenBudget = Math.max(params.maxTokens ?? 2048, 2048);
       const basetenRes = await fetchWithRetry(basetenUrl, {
         method: "POST",
         headers: {

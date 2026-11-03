@@ -330,7 +330,7 @@ export async function celebrateStepUniversal(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2800);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     const response = await fetch('/api/step-celebration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

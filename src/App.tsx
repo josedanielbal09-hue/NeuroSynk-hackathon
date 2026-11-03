@@ -897,38 +897,27 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
   const isSystemBooted = useRef(false);
 
-  const surveyAnswersRef = useRef<Record<string, string>>({});
-  useEffect(() => {
-    surveyAnswersRef.current = surveyAnswers;
-  }, [surveyAnswers]);
-
   const handleStart = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const finalTask = task.trim() ? task : 'Estudiar material general';
     setTask(finalTask);
-
-    // Transición optimista instantánea (0ms de espera): abre el modal de inmediato con las preguntas base
-    surveyAnswersRef.current = {};
-    setSurveyAnswers({});
-    setSurveyQuestions(DEFAULT_SURVEY_QUESTIONS);
-    setShowSurvey(true);
     setIsSurveyLoading(true);
 
-    // Refinamiento asíncrono con IA en segundo plano
-    taskSurveyUniversal(finalTask, geminiApiKey)
-      .then(data => {
-        if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
-          if (Object.keys(surveyAnswersRef.current).length === 0) {
-            setSurveyQuestions(data.questions);
-          }
-        }
-      })
-      .catch(err => {
-        console.warn("Task survey background refinement notice:", err);
-      })
-      .finally(() => {
-        setIsSurveyLoading(false);
-      });
+    try {
+      const data = await taskSurveyUniversal(finalTask, geminiApiKey);
+      if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+        setSurveyQuestions(data.questions);
+      } else {
+        setSurveyQuestions(DEFAULT_SURVEY_QUESTIONS);
+      }
+    } catch (err) {
+      console.error("Task survey fetch error:", err);
+      setSurveyQuestions(DEFAULT_SURVEY_QUESTIONS);
+    } finally {
+      setSurveyAnswers({});
+      setShowSurvey(true);
+      setIsSurveyLoading(false);
+    }
   };
 
   const handleGenerateFromSurvey = async (useAnswers: boolean = true) => {
@@ -1893,18 +1882,19 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       }
 
       if (nextIdx < steps.length) {
-        // Vocalización instantánea (< 5ms) de FocusBud al completar el paso sin esperar llamada de red
+        // Vocalización de FocusBud al completar el paso conectada en vivo con Baseten /api/step-celebration
         const nextStepText = steps[nextIdx] || '';
         const isNextSomatic = /^PAUSA(\s+SOMÁTICA)?/i.test(nextStepText);
         if (isNextSomatic) {
           speakFocusBud("Paso completado. Ahora entramos en una pausa somática. Inhala profundo y relaja los hombros.", { force: true });
         } else {
-          const clean = completedStepText.replace(/^(\d+\.?\s*|[-•*]\s*)/, '').trim();
-          const match = clean.match(/^([A-ZÁÉÍÓÚÑ]{3,})\s+(.*)/i);
-          const instantPhrase = match
-            ? `¡Excelente al ${match[1].toLowerCase()} ${match[2].slice(0, 38).replace(/[.,;:].*$/, '').trim()}! Vamos por el siguiente paso.`
-            : `¡Paso dominado con éxito! Avanzamos con el siguiente objetivo.`;
-          speakFocusBud(instantPhrase, { force: true, rate: 1.04 });
+          celebrateStepUniversal(completedStepText, nextStepText, task)
+            .then(aiPhrase => {
+              speakFocusBud(aiPhrase, { force: true, rate: 1.03 });
+            })
+            .catch(() => {
+              speakFocusBud("¡Paso dominado con éxito! Mantén el foco en el siguiente.", { force: true, rate: 1.02 });
+            });
         }
       }
     }

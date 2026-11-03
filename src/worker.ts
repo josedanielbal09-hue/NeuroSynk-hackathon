@@ -34,43 +34,45 @@ async function callAIModel(
   env: Env,
   request?: Request,
   temperature: number = 0.7,
-  maxTokens: number = 800
+  maxTokens: number = 2048
 ): Promise<string> {
   const basetenKey = getEffectiveBasetenKey(env, request);
-  // Meta Muse Spark Open uses internal reasoning_tokens (~140-220 tokens) before emitting content,
-  // so max_tokens must always be >= 500 to avoid finish_reason="length" with empty content.
-  const effectiveMaxTokens = Math.max(500, Math.min(maxTokens, 950));
+  // Meta Muse Spark Open uses internal reasoning_tokens (500-900 tokens) + output tokens,
+  // so max_tokens MUST be >= 2048 so the JSON/text response is NEVER truncated.
+  const effectiveMaxTokens = Math.max(maxTokens, 2048);
 
-  // Exclusive call to Baseten (Meta Muse Spark Open)
+  // Exclusive call to Baseten (Meta Muse Spark Open) with retry on transient errors
   if (basetenKey) {
-    try {
-      const res = await fetch("https://inference.baseten.co/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${basetenKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "meta-models/muse-spark-open-1026",
-          messages: [
-            ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-            { role: "user", content: prompt }
-          ],
-          reasoning_effort: "minimal",
-          temperature,
-          max_tokens: effectiveMaxTokens
-        })
-      });
-      if (res.ok) {
-        const data: any = await res.json();
-        const content = data.choices?.[0]?.message?.content || "";
-        const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-        if (clean.length > 0) return clean;
-      } else {
-        console.warn("[Worker AI] Baseten status:", res.status);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch("https://inference.baseten.co/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${basetenKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "meta-models/muse-spark-open-1026",
+            messages: [
+              ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+              { role: "user", content: prompt }
+            ],
+            reasoning_effort: "minimal",
+            temperature,
+            max_tokens: effectiveMaxTokens
+          })
+        });
+        if (res.ok) {
+          const data: any = await res.json();
+          const content = data.choices?.[0]?.message?.content || "";
+          const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+          if (clean.length > 0) return clean;
+        } else {
+          console.warn("[Worker AI] Baseten status:", res.status);
+        }
+      } catch (e) {
+        console.warn("[Worker AI] Baseten error:", e);
       }
-    } catch (e) {
-      console.warn("[Worker AI] Baseten error:", e);
     }
   }
 
