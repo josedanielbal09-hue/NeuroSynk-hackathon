@@ -1,3 +1,5 @@
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
 import dotenv from "dotenv";
 dotenv.config();
 dotenv.config({ path: ".env.local" });
@@ -28,29 +30,29 @@ interface MetaCallParams {
 /**
  * Robust fetch wrapper with timeout and 1-2 retries for transient socket closes (e.g. idle Keep-Alive drops)
  */
-async function fetchWithRetry(url: string, options: any, retries = 2, timeoutMs = 15000): Promise<Response> {
-  let lastError: any = null;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      });
-      clearTimeout(timeout);
-      return res;
-    } catch (err: any) {
-      clearTimeout(timeout);
-      lastError = err;
-      const detail = err?.cause?.message || err?.cause || err?.message || err;
-      if (attempt < retries) {
-        console.warn(`[Network Retry] Attempt ${attempt + 1} to ${new URL(url).host} failed (${detail}). Re-trying on fresh socket...`);
-        await new Promise(r => setTimeout(r, 400));
-      }
-    }
-  }
-  throw lastError;
+async function fetchWithRetry(url: string, options: any, retries = 1, timeoutMs = 8000): Promise<Response> {
+  let lastError: any = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      return res;
+    } catch (err: any) {
+      clearTimeout(timeout);
+      lastError = err;
+      const detail = err?.cause?.message || err?.cause || err?.message || err;
+      if (attempt < retries) {
+        console.warn(`[Network Retry] Attempt ${attempt + 1} to ${new URL(url).host} failed (${detail}). Re-trying on fresh socket...`);
+        await new Promise(r => setTimeout(r, 250));
+      }
+    }
+  }
+  throw lastError;
 }
 
 /**
@@ -122,8 +124,8 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
   // 2. Try Baseten fallback (Muse Spark Open)
   if (BASETEN_API_KEY) {
     try {
-      const basetenUrl = process.env.BASETEN_ENDPOINT_URL || "https://inference.baseten.co/v1/chat/completions";
-      const tokenBudget = Math.max(params.maxTokens ?? 2048, 800);
+      const basetenUrl = process.env.BASETEN_ENDPOINT_URL || "https://inference.baseten.co/v1/chat/completions";
+      const tokenBudget = Math.max(80, Math.min(params.maxTokens ?? 450, 900));
       const basetenRes = await fetchWithRetry(basetenUrl, {
         method: "POST",
         headers: {
@@ -243,13 +245,13 @@ app.post("/api/task-survey", async (req, res) => {
 Tu misión es diseñar una encuesta de calibración rápida de EXACTAMENTE 5 preguntas breves a partir de la meta introducida por el usuario.
 Responde estrictamente con un JSON con la clave "questions": array de objetos con "id", "question", "options".`;
 
-    const text = await callMetaModel({
-      model: "muse-wonder-1.0",
-      systemPrompt: prompt_sistema,
-      userPrompt: `Meta del usuario: "${task}"`,
-      maxTokens: 2048,
-      reasoningEffort: "minimal",
-      apiKeyOverride: headerKey
+    const text = await callMetaModel({
+      model: "muse-wonder-1.0",
+      systemPrompt: prompt_sistema,
+      userPrompt: `Meta del usuario: "${task}"`,
+      maxTokens: 480,
+      reasoningEffort: "minimal",
+      apiKeyOverride: headerKey
     });
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -319,13 +321,13 @@ Tu misión es diseñar una sesión de trabajo realista basada en las respuestas 
 Cada paso debe iniciar con un VERBO DE ACCIÓN EN MAYÚSCULAS. Cero formato Markdown.
 Responde estrictamente con un JSON con la clave "steps": array de strings.`;
 
-    const text = await callMetaModel({
-      model: "muse-wonder-1.0",
-      systemPrompt: prompt_sistema,
-      userPrompt: `OBJETIVO: "${task}"\nRESPUESTAS: ${JSON.stringify(surveyAnswers || {})}\nCONTEXTO: "${context || 'General'}"`,
-      reasoningEffort: "minimal",
-      maxTokens: 2048,
-      apiKeyOverride: headerKey
+    const text = await callMetaModel({
+      model: "muse-wonder-1.0",
+      systemPrompt: prompt_sistema,
+      userPrompt: `OBJETIVO: "${task}"\nRESPUESTAS: ${JSON.stringify(surveyAnswers || {})}\nCONTEXTO: "${context || 'General'}"`,
+      reasoningEffort: "minimal",
+      maxTokens: 450,
+      apiKeyOverride: headerKey
     });
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -373,14 +375,14 @@ Tu usuario acaba de completar un micro-paso de su sesión de enfoque.
 Formula una sola frase natural, breve, cálida y motivadora (MÁXIMO 14 PALABRAS) que reconozca ESPECÍFICAMENTE la actividad concreta que acaba de dominar para que sienta que lo estás acompañando de verdad en tiempo real.
 Habla en español directo, entusiasta y humano. Cero formato markdown y sin comillas.`;
 
-    const text = await callMetaModel({
-      model: "muse-spark-1.0",
-      systemPrompt: prompt_sistema,
-      userPrompt: `Actividad completada: "${completedStep}"\nSiguiente paso: "${nextStep || 'siguiente'}"\nMeta general: "${taskContext || ''}"`,
-      maxTokens: 600,
-      reasoningEffort: "minimal",
-      temperature: 0.75,
-      apiKeyOverride: headerKey
+    const text = await callMetaModel({
+      model: "muse-spark-1.0",
+      systemPrompt: prompt_sistema,
+      userPrompt: `Actividad completada: "${completedStep}"\nSiguiente paso: "${nextStep || 'siguiente'}"\nMeta general: "${taskContext || ''}"`,
+      maxTokens: 120,
+      reasoningEffort: "minimal",
+      temperature: 0.75,
+      apiKeyOverride: headerKey
     });
 
     let cleanText = text.replace(/["*]/g, '').trim();
@@ -474,13 +476,13 @@ Inicia SIEMPRE con un VERBO DE ACCIÓN EN MAYÚSCULAS. Cero Markdown. Tono de co
       }
     }
 
-    const text = await callMetaModel({
-      model: "muse-spark-1.0",
-      systemPrompt: prompt_sistema,
-      userPrompt: `Paso activo: "${currentStep || 'Trabajo'}"\nContexto: "${taskContext || 'General'}"\nMensaje: "${userText}"`,
-      reasoningEffort: "minimal",
-      maxTokens: 750,
-      apiKeyOverride: headerKey
+    const text = await callMetaModel({
+      model: "muse-spark-1.0",
+      systemPrompt: prompt_sistema,
+      userPrompt: `Paso activo: "${currentStep || 'Trabajo'}"\nContexto: "${taskContext || 'General'}"\nMensaje: "${userText}"`,
+      reasoningEffort: "minimal",
+      maxTokens: 160,
+      apiKeyOverride: headerKey
     });
 
     const cleanReply = text.replace(/[*_#]/g, '').trim();
@@ -526,13 +528,13 @@ Promedio de enfoque: ${averageFocus}%
 Tiempo en Flow: ${flowPercentage}%
 Picos de fatiga gestionados: ${fatigueEventsCount}`;
 
-    const text = await callMetaModel({
-      model: "muse-spark-1.0",
-      systemPrompt: prompt_sistema,
-      userPrompt,
-      reasoningEffort: "minimal",
-      maxTokens: 750,
-      apiKeyOverride: headerKey
+    const text = await callMetaModel({
+      model: "muse-spark-1.0",
+      systemPrompt: prompt_sistema,
+      userPrompt,
+      reasoningEffort: "minimal",
+      maxTokens: 220,
+      apiKeyOverride: headerKey
     });
 
     const clean = text.replace(/[*_#]/g, '').trim();
@@ -570,11 +572,11 @@ app.post("/api/meta/muse-spark/stream", async (req, res) => {
 Instrucción ESTRICTA: Genera ÚNICAMENTE UNA sola micro-instrucción en español de MÁXIMO 12 PALABRAS que inicie con un VERBO DE ACCIÓN EN MAYÚSCULAS. Cero explicaciones, cero inglés, cero razonamiento.`;
 
   try {
-    const text = await callMetaModel({
-      model: "muse-spark-1.0",
-      userPrompt: prompt,
-      temperature: 0.4,
-      maxTokens: 750
+    const text = await callMetaModel({
+      model: "muse-spark-1.0",
+      userPrompt: prompt,
+      temperature: 0.4,
+      maxTokens: 120
     });
 
     let cleanText = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#"`]/g, '').trim();
@@ -639,11 +641,12 @@ app.post("/api/meta/muse-wonder/decompose", async (req, res) => {
   };
 
   try {
-    const text = await callMetaModel({
-      model: "muse-wonder-1.0",
-      systemPrompt: "Eres Muse Wonder. Descompón la tarea en exactamente 3 nano-pasos ejecutables en menos de 60 segundos cada uno. Responde en JSON con la clave 'nanoSteps': array de strings.",
-      userPrompt: `Tarea: "${task}", PERCLOS: ${perclos}%, Estrés: ${stressLevel}%`,
-      reasoningEffort: "high"
+    const text = await callMetaModel({
+      model: "muse-wonder-1.0",
+      systemPrompt: "Eres Muse Wonder. Descompón la tarea en exactamente 3 nano-pasos ejecutables en menos de 60 segundos cada uno. Responde en JSON con la clave 'nanoSteps': array de strings.",
+      userPrompt: `Tarea: "${task}", PERCLOS: ${perclos}%, Estrés: ${stressLevel}%`,
+      reasoningEffort: "minimal",
+      maxTokens: 280
     });
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);

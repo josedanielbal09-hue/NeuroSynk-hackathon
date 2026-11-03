@@ -73,11 +73,14 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
 
   return (
     <div className="relative min-h-screen w-full bg-zinc-950 text-zinc-100 flex flex-col justify-between items-center px-4 py-8 sm:py-12 overflow-hidden select-none">
-      {/* Dynamic Background Glow Effect */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-gradient-to-b from-emerald-500/10 via-purple-500/5 to-transparent blur-3xl opacity-70 rounded-full" />
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[300px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none" />
-      </div>
+      {/* Dynamic Background Glow Effect (Zero-Blur Radial Gradients for 60 FPS GPU Compositing) */}
+      <div
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+        style={{
+          background:
+            'radial-gradient(ellipse 65% 45% at 50% 22%, rgba(16, 185, 129, 0.11), rgba(168, 85, 247, 0.04) 45%, transparent 80%)'
+        }}
+      />
 
       {/* Top Bar Minimalist */}
       <header className="w-full max-w-5xl flex items-center justify-between z-10 px-2 sm:px-4">
@@ -130,15 +133,11 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
           <div className="relative group cursor-pointer" onClick={() => onOpenSettings?.()}>
             <FocusBudLiving
               size={124}
-              flowScore={85}
-              stressLevel={15}
-              fatigueLevel={10}
-              isThinking={isBusy}
+              state={isBusy ? "CELEBRACION" : "ENFOQUE"}
+              isStreaming={isBusy}
               isSpeaking={false}
-              expression={isBusy ? "celebrate" : "normal"}
+              isFlow={!isBusy}
             />
-            {/* Soft Ambient Shadow Aura */}
-            <div className="absolute -inset-4 bg-emerald-500/15 blur-2xl -z-10 rounded-full opacity-60 group-hover:opacity-100 transition-opacity" />
           </div>
         </motion.div>
 
@@ -183,7 +182,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
           onSubmit={handleSubmit}
           className="w-full relative group"
         >
-          <div className="relative flex items-center w-full rounded-2xl sm:rounded-3xl bg-zinc-900/90 border border-zinc-800/90 hover:border-zinc-700/80 focus-within:border-emerald-500/60 focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:shadow-[0_0_50px_rgba(16,185,129,0.14)] backdrop-blur-2xl transition-all duration-300 p-2 sm:p-2.5">
+          <div className="relative flex items-center w-full rounded-2xl sm:rounded-3xl bg-zinc-900/95 border border-zinc-800/90 hover:border-zinc-700/80 focus-within:border-emerald-500/60 focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:shadow-[0_0_35px_rgba(16,185,129,0.14)] transition-colors duration-200 p-2 sm:p-2.5">
             <div className="pl-3 sm:pl-4 pr-2 text-zinc-500 group-focus-within:text-emerald-400 transition-colors">
               <Sparkles className="w-5 h-5" />
             </div>

@@ -26,7 +26,7 @@ export interface FocusBudWidgetProps {
  * Integra el Avatar reactivo, el bocadillo estilizado de acompañamiento empático
  * y la reproducción de voz/earcons procedurales mediante audioService.
  */
-export const FocusBudWidget: React.FC<FocusBudWidgetProps> = ({
+export const FocusBudWidget: React.FC<FocusBudWidgetProps> = React.memo(({
   state,
   message,
   className = '',
@@ -118,7 +118,8 @@ export const FocusBudWidget: React.FC<FocusBudWidgetProps> = ({
       </div>
     </div>
   );
-};
+});
 
+FocusBudWidget.displayName = 'FocusBudWidget';
 
 export default FocusBudWidget;

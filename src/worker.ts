@@ -34,10 +34,10 @@ async function callAIModel(
   env: Env,
   request?: Request,
   temperature: number = 0.7,
-  maxTokens: number = 1500
+  maxTokens: number = 420
 ): Promise<string> {
   const basetenKey = getEffectiveBasetenKey(env, request);
-  const effectiveMaxTokens = Math.max(maxTokens, 1500);
+  const effectiveMaxTokens = Math.max(80, Math.min(maxTokens, 800));
 
   // Exclusive call to Baseten (Meta Muse Spark Open)
   if (basetenKey) {

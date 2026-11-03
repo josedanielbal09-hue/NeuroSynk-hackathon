@@ -232,6 +232,11 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
     let lastFrameTime = startTime;
 
     const loop = (currentTime: number) => {
+      if (document.hidden) {
+        animFrameRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
       const dt = Math.min(100, currentTime - lastFrameTime);
       lastFrameTime = currentTime;
       const elapsed = currentTime - startTime;
@@ -428,26 +433,12 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
         className="w-full h-full overflow-visible will-change-transform"
       >
         <defs>
-          {/* Filtro de resplandor atómico para los ojos */}
-          <filter id="eyeGlowFilter" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-
           {/* Gradiente de Aura Bioluminiscente (100% acelerado por hardware sin filtros CPU pesados) */}
           <radialGradient id="ambientAuraGrad" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor={palette.coreGlow} stopOpacity="0.80" />
             <stop offset="45%" stopColor={palette.coreGlow} stopOpacity="0.30" />
             <stop offset="100%" stopColor={palette.coreGlow} stopOpacity="0" />
           </radialGradient>
-
-          {/* Filtro de resonancia para Modo Flow */}
-          <filter id="flowAuraFilter" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="8" />
-          </filter>
 
           {/* Gradiente del cuerpo esférico (Obsidiana con reflejos) */}
           <radialGradient id="sphereGrad" cx="38%" cy="32%" r="65%">
@@ -472,7 +463,7 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
           </radialGradient>
         </defs>
 
-        {/* 1. Halo Ondulatorio de Resonancia en Modo Flow */}
+        {/* 1. Halo Ondulatorio de Resonancia en Modo Flow (Zero-Blur GPU Ring) */}
         {isFlowActive && (
           <circle
             ref={flowRingRef}
@@ -481,9 +472,8 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
             r={sphereR + 18}
             fill="none"
             stroke={palette.rimColor}
-            strokeWidth="1.5"
-            strokeOpacity="0.35"
-            filter="url(#flowAuraFilter)"
+            strokeWidth="2"
+            strokeOpacity="0.4"
           />
         )}
 
@@ -570,10 +560,10 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
             />
           </g>
 
-          {/* 6. Ojos Procedurales Expresivos Controlados Directamente por DOM Refs (Cero React re-renders) */}
-          <g ref={eyesGroupRef} style={{ transformOrigin: `${centerX}px ${centerY}px` }}>
+          {/* 6. Ojos Procedurales Expresivos Controlados Directamente por DOM Refs (Cero React re-renders, Cero feGaussianBlur) */}
+          <g ref={eyesGroupRef} style={{ transformOrigin: `${centerX}px ${centerY}px`, filter: `drop-shadow(0 0 6px ${palette.eyeColor})` }}>
             {/* a) ENFOQUE (Default) */}
-            <g ref={eyeEnfoqueRef} style={{ display: 'inline' }} filter="url(#eyeGlowFilter)">
+            <g ref={eyeEnfoqueRef} style={{ display: 'inline' }}>
               <rect x={leftEyeBaseX - 6} y={eyeBaseY - 8} width="12" height="17" rx="6" fill={palette.eyeColor} />
               <rect x={rightEyeBaseX - 6} y={eyeBaseY - 8} width="12" height="17" rx="6" fill={palette.eyeColor} />
               <circle cx={leftEyeBaseX - 2} cy={eyeBaseY - 4} r="2.2" fill="#ffffff" opacity="0.95" />
@@ -581,7 +571,7 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
             </g>
 
             {/* b) CELEBRACION (^ ^ con mejillas sonrojadas) */}
-            <g ref={eyeCelebrationRef} style={{ display: 'none' }} filter="url(#eyeGlowFilter)">
+            <g ref={eyeCelebrationRef} style={{ display: 'none' }}>
               <path d={`M ${leftEyeBaseX - 9} ${eyeBaseY + 3} Q ${leftEyeBaseX} ${eyeBaseY - 9} ${leftEyeBaseX + 9} ${eyeBaseY + 3}`} stroke={palette.eyeColor} strokeWidth="3.5" strokeLinecap="round" fill="none" />
               <path d={`M ${rightEyeBaseX - 9} ${eyeBaseY + 3} Q ${rightEyeBaseX} ${eyeBaseY - 9} ${rightEyeBaseX + 9} ${eyeBaseY + 3}`} stroke={palette.eyeColor} strokeWidth="3.5" strokeLinecap="round" fill="none" />
               <ellipse cx={leftEyeBaseX - 11} cy={eyeBaseY + 11} rx="4" ry="2" fill={palette.accentColor} opacity="0.75" />
@@ -589,19 +579,19 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
             </g>
 
             {/* c) BLINK (Parpadeo) */}
-            <g ref={eyeBlinkRef} style={{ display: 'none' }} stroke={palette.eyeColor} strokeWidth="3" strokeLinecap="round" filter="url(#eyeGlowFilter)">
+            <g ref={eyeBlinkRef} style={{ display: 'none' }} stroke={palette.eyeColor} strokeWidth="3" strokeLinecap="round">
               <path d={`M ${leftEyeBaseX - 8} ${eyeBaseY} Q ${leftEyeBaseX} ${eyeBaseY + 2} ${leftEyeBaseX + 8} ${eyeBaseY}`} />
               <path d={`M ${rightEyeBaseX - 8} ${eyeBaseY} Q ${rightEyeBaseX} ${eyeBaseY + 2} ${rightEyeBaseX + 8} ${eyeBaseY}`} />
             </g>
 
             {/* d) ZEN (Ojos curvos relajados) */}
-            <g ref={eyeZenRef} style={{ display: 'none' }} stroke={palette.eyeColor} strokeWidth="3.2" strokeLinecap="round" fill="none" filter="url(#eyeGlowFilter)" opacity="0.95">
+            <g ref={eyeZenRef} style={{ display: 'none' }} stroke={palette.eyeColor} strokeWidth="3.2" strokeLinecap="round" fill="none" opacity="0.95">
               <path d={`M ${leftEyeBaseX - 8} ${eyeBaseY - 1} Q ${leftEyeBaseX} ${eyeBaseY + 7} ${leftEyeBaseX + 8} ${eyeBaseY - 1}`} />
               <path d={`M ${rightEyeBaseX - 8} ${eyeBaseY - 1} Q ${rightEyeBaseX} ${eyeBaseY + 7} ${rightEyeBaseX + 8} ${eyeBaseY - 1}`} />
             </g>
 
             {/* e) ALERTA (Ojos abiertos curiosos) */}
-            <g ref={eyeAlertaRef} style={{ display: 'none' }} filter="url(#eyeGlowFilter)">
+            <g ref={eyeAlertaRef} style={{ display: 'none' }}>
               <ellipse cx={leftEyeBaseX} cy={eyeBaseY} rx="8" ry="9" fill={palette.eyeColor} />
               <ellipse cx={rightEyeBaseX} cy={eyeBaseY} rx="8" ry="9" fill={palette.eyeColor} />
               <circle cx={leftEyeBaseX + 2} cy={eyeBaseY - 3} r="2.2" fill="#ffffff" />
@@ -609,7 +599,7 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
             </g>
 
             {/* f) FATIGA (Párpados pesados) */}
-            <g ref={eyeFatigaRef} style={{ display: 'none' }} filter="url(#eyeGlowFilter)" opacity="0.88">
+            <g ref={eyeFatigaRef} style={{ display: 'none' }} opacity="0.88">
               <rect x={leftEyeBaseX - 6} y={eyeBaseY - 5} width="12" height="13" rx="5" fill={palette.eyeColor} />
               <rect x={rightEyeBaseX - 6} y={eyeBaseY - 5} width="12" height="13" rx="5" fill={palette.eyeColor} />
               <path d={`M ${leftEyeBaseX - 8} ${eyeBaseY - 7} Q ${leftEyeBaseX} ${eyeBaseY - 1} ${leftEyeBaseX + 8} ${eyeBaseY - 7} Z`} fill="#09090b" />
@@ -617,7 +607,7 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
             </g>
 
             {/* g) PARALISIS (Pupilas contraídas en tensión) */}
-            <g ref={eyeParalisisRef} style={{ display: 'none' }} filter="url(#eyeGlowFilter)">
+            <g ref={eyeParalisisRef} style={{ display: 'none' }}>
               <rect x={leftEyeBaseX - 5} y={eyeBaseY - 7} width="10" height="14" rx="4" fill={palette.eyeColor} />
               <rect x={rightEyeBaseX - 5} y={eyeBaseY - 7} width="10" height="14" rx="4" fill={palette.eyeColor} />
               <circle cx={leftEyeBaseX} cy={eyeBaseY} r="2" fill="#09090b" />
@@ -634,7 +624,6 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
               strokeWidth="2.5"
               strokeLinecap="round"
               fill="none"
-              filter="url(#eyeGlowFilter)"
             />
           )}
 
@@ -645,7 +634,6 @@ export const FocusBudLiving: React.FC<FocusBudLivingProps> = React.memo(({
             r={isFlowActive ? "3.5" : "3"}
             fill={palette.rimColor}
             opacity={0.7}
-            filter="url(#eyeGlowFilter)"
           />
         </g>
       </svg>

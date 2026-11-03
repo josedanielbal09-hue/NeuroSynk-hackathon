@@ -268,7 +268,7 @@ export default function App() {
 
   const handleStartNewSession = () => {
     // Si la sesión anterior tuvo avance, asegurar que quede grabada en el historial
-    if (currentSessionIdRef.current && (elapsedTime > 15 || currentStepIdx > 0)) {
+    if (currentSessionIdRef.current && (elapsedTimeRef.current > 15 || currentStepIdx > 0)) {
       const focusHistory = focusSamplesRef.current;
       const avgFocus = focusHistory.length > 0
         ? Math.round(focusHistory.reduce((a, b) => a + b, 0) / focusHistory.length)
@@ -277,7 +277,7 @@ export default function App() {
         id: currentSessionIdRef.current,
         task: task || 'Sesión de Trabajo',
         timestamp: Date.now(),
-        durationMinutes: Math.max(1, Math.round(elapsedTime / 60)),
+        durationMinutes: Math.max(1, Math.round(elapsedTimeRef.current / 60)),
         completedSteps: currentStepIdx,
         totalSteps: steps.length,
         avgFocus: avgFocus,
@@ -295,6 +295,7 @@ export default function App() {
     setChatMessages([]);
     setSessionDebrief(null);
     debriefRequestedRef.current = false;
+    elapsedTimeRef.current = 0;
     setElapsedTime(0);
     setIsPaused(false);
     setTimerSecondsLeft(workDuration);
@@ -461,7 +462,7 @@ export default function App() {
     cognitiveState: aiPrediction?.className || 'NEUTRO',
     focusScore: Math.round(metricsRef.current.nivel_clap),
     stressLevel: Math.round(metricsRef.current.nivel_carga),
-    sessionMinutes: Math.round(elapsedTime / 60),
+    sessionMinutes: Math.round(elapsedTimeRef.current / 60),
     postureState: postureHygiene.status
   });
 
@@ -584,12 +585,13 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     };
   }, []);
 
-  // Separate Timer logic with Pause control (Total Session Time)
+  // Separate Timer logic with Pause control (Total Session Time - Zero Re-renders during session)
+  const elapsedTimeRef = useRef<number>(0);
   useEffect(() => {
     let timerInterval: any;
     if (isStarted && currentStepIdx < steps.length && !isPaused) {
       timerInterval = setInterval(() => {
-        setElapsedTime(prev => prev + 1);
+        elapsedTimeRef.current += 1;
       }, 1000);
     }
     return () => {
@@ -601,6 +603,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
   useEffect(() => {
     if (steps.length > 0 && currentStepIdx >= steps.length && !debriefRequestedRef.current) {
       debriefRequestedRef.current = true;
+      setElapsedTime(elapsedTimeRef.current);
       setIsDebriefLoading(true);
 
       const focusHistory = focusSamplesRef.current;
@@ -608,7 +611,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         ? Math.round(focusHistory.reduce((a, b) => a + b, 0) / focusHistory.length)
         : Math.round(metricsRef.current.nivel_clap);
 
-      const totalMins = Math.max(1, Math.round(elapsedTime / 60));
+      const totalMins = Math.max(1, Math.round(elapsedTimeRef.current / 60));
       const flowPct = focusHistory.length > 0
         ? Math.min(100, Math.round((flowSamplesCountRef.current / focusHistory.length) * 100))
         : 65;
@@ -894,27 +897,38 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
   const isSystemBooted = useRef(false);
 
-  const handleStart = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const surveyAnswersRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    surveyAnswersRef.current = surveyAnswers;
+  }, [surveyAnswers]);
+
+  const handleStart = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     const finalTask = task.trim() ? task : 'Estudiar material general';
     setTask(finalTask);
+
+    // Transición optimista instantánea (0ms de espera): abre el modal de inmediato con las preguntas base
+    surveyAnswersRef.current = {};
+    setSurveyAnswers({});
+    setSurveyQuestions(DEFAULT_SURVEY_QUESTIONS);
+    setShowSurvey(true);
     setIsSurveyLoading(true);
 
-    try {
-      const data = await taskSurveyUniversal(finalTask, geminiApiKey);
-      if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
-        setSurveyQuestions(data.questions);
-      } else {
-        setSurveyQuestions(DEFAULT_SURVEY_QUESTIONS);
-      }
-    } catch (err) {
-      console.error("Task survey fetch error:", err);
-      setSurveyQuestions(DEFAULT_SURVEY_QUESTIONS);
-    } finally {
-      setSurveyAnswers({});
-      setShowSurvey(true);
-      setIsSurveyLoading(false);
-    }
+    // Refinamiento asíncrono con IA en segundo plano
+    taskSurveyUniversal(finalTask, geminiApiKey)
+      .then(data => {
+        if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+          if (Object.keys(surveyAnswersRef.current).length === 0) {
+            setSurveyQuestions(data.questions);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn("Task survey background refinement notice:", err);
+      })
+      .finally(() => {
+        setIsSurveyLoading(false);
+      });
   };
 
   const handleGenerateFromSurvey = async (useAnswers: boolean = true) => {
@@ -1132,13 +1146,13 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             setWarmupProgress(prev => Math.max(prev, 70));
           }
 
-          // 2. Solicitar cámara nativa en 640x480
+          // 2. Solicitar cámara nativa en 320x240 (1/4 de consumo de RAM y ancho de banda USB/WASM)
           if (statusRef.current) statusRef.current.textContent = "SOLICITANDO CAMARA...";
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
-              width: { ideal: 640, max: 640 },
-              height: { ideal: 480, max: 480 },
-              frameRate: { ideal: 15, max: 20 },
+              width: { ideal: 320, max: 480 },
+              height: { ideal: 240, max: 360 },
+              frameRate: { ideal: 12, max: 15 },
               facingMode: "user"
             }
           });
@@ -1184,7 +1198,9 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                 const now = performance.now();
 
                 if (
-                  now - lastFrameProcessTimeRef.current >= 100 &&
+                  !document.hidden &&
+                  !isPausedRef.current &&
+                  now - lastFrameProcessTimeRef.current >= 140 &&
                   videoRef.current &&
                   videoRef.current.readyState >= 2 &&
                   videoRef.current.videoWidth > 0 &&
@@ -1554,18 +1570,31 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         className: CLASS_NAMES[displayedClassRef.current] || aiResult.className
       };
 
-      // Throttling de 200ms para setAiPrediction (previene re-renders innecesarios manteniendo 60 FPS en el canvas)
-      if (now - lastAiUpdateRef.current >= 200) {
+      // Guardado inteligente: Solo actualizar React state cuando cambie la clase cognitiva o la confianza varíe >= 4%
+      if (now - lastAiUpdateRef.current >= 250) {
         lastAiUpdateRef.current = now;
-        setAiPrediction(stabilizedResult);
 
-        // Registro de métricas anónimas en sesión activa para el debriefing cognitivo
+        // Registro de métricas anónimas en sesión activa para el debriefing cognitivo (buffer circular acotado a 300 muestras para cuidar la RAM)
         if (isStarted && currentStepIdx < steps.length && !isPaused) {
+          if (focusSamplesRef.current.length >= 300) {
+            focusSamplesRef.current.shift();
+          }
           focusSamplesRef.current.push(aiResult.focusScore);
           if (displayedClassRef.current === 1) { // 1 = FLOW
             flowSamplesCountRef.current += 1;
           }
         }
+
+        setAiPrediction(prev => {
+          if (
+            prev &&
+            prev.classIndex === stabilizedResult.classIndex &&
+            Math.abs(prev.confidence - stabilizedResult.confidence) < 0.04
+          ) {
+            return prev;
+          }
+          return stabilizedResult;
+        });
       }
 
       // Control Directo de Métricas C.L.A.P. y Carga Cognitiva con Suavizado Exponencial Orgánico
@@ -1641,7 +1670,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           pBg = 'bg-rose-950/40 border-rose-800/40';
         }
 
-        setPostureHygiene({ status: pStatus, label: pLabel, color: pColor, bg: pBg });
+        setPostureHygiene(prev => {
+          if (prev.status === pStatus) return prev;
+          return { status: pStatus, label: pLabel, color: pColor, bg: pBg };
+        });
       }
 
       // Intervención proactiva en Streaming con Meta Muse Spark hacia FocusBud cuando la Red Neuronal detecta sobrecarga continua
@@ -1666,7 +1698,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             fatigueScore: Math.round(pFatiga * 100),
             postureScore: Math.round(metrics.nivel_carga),
             currentTask: steps[currentStepIdx] || task || 'Trabajo en curso',
-            sessionMinutes: Math.round(elapsedTime / 60),
+            sessionMinutes: Math.round(elapsedTimeRef.current / 60),
             cognitiveClass: stabilizedResult.className
           },
           (chunk: string) => {
@@ -1792,6 +1824,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     setTask(proposedChange.proposedTask);
     setSteps(newSteps);
     setCurrentStepIdx(0);
+    elapsedTimeRef.current = 0;
     setElapsedTime(0);
 
     metricsRef.current.subdivided_indexes = [];
@@ -1833,43 +1866,45 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       rewardTimeoutRef.current = window.setTimeout(() => {
         setIsShowingReward(false);
         rewardTimeoutRef.current = null;
-      }, 2000);
+      }, 1150);
 
-      // Actualizar progreso de la sesión en el historial local en tiempo real
+      // Diferir persistencia en localStorage por 250ms para que el frame 0 de la animación sea instantáneo (60 FPS puros)
       if (currentSessionIdRef.current) {
-        const focusHistory = focusSamplesRef.current;
-        const avgFocus = focusHistory.length > 0
-          ? Math.round(focusHistory.reduce((a, b) => a + b, 0) / focusHistory.length)
-          : Math.round(metricsRef.current.nivel_clap);
-        const totalMins = Math.max(1, Math.round(elapsedTime / 60));
-        saveSessionItem({
-          id: currentSessionIdRef.current,
-          task: task || 'Sesión de Trabajo',
-          timestamp: Date.now(),
-          durationMinutes: totalMins,
-          completedSteps: nextIdx,
-          totalSteps: steps.length,
-          avgFocus,
-          status: nextIdx >= steps.length ? 'COMPLETADA' : 'EN_PROGRESO'
-        });
+        const sessionId = currentSessionIdRef.current;
+        const currentTaskTitle = task || 'Sesión de Trabajo';
+        const totalStepsCount = steps.length;
+        window.setTimeout(() => {
+          const focusHistory = focusSamplesRef.current;
+          const avgFocus = focusHistory.length > 0
+            ? Math.round(focusHistory.reduce((a, b) => a + b, 0) / focusHistory.length)
+            : Math.round(metricsRef.current.nivel_clap);
+          const totalMins = Math.max(1, Math.round(elapsedTimeRef.current / 60));
+          saveSessionItem({
+            id: sessionId,
+            task: currentTaskTitle,
+            timestamp: Date.now(),
+            durationMinutes: totalMins,
+            completedSteps: nextIdx,
+            totalSteps: totalStepsCount,
+            avgFocus,
+            status: nextIdx >= totalStepsCount ? 'COMPLETADA' : 'EN_PROGRESO'
+          });
+        }, 250);
       }
 
       if (nextIdx < steps.length) {
-
-        // Vocalización autónoma de FocusBud al completar el paso (3-5 segundos)
+        // Vocalización instantánea (< 5ms) de FocusBud al completar el paso sin esperar llamada de red
         const nextStepText = steps[nextIdx] || '';
         const isNextSomatic = /^PAUSA(\s+SOMÁTICA)?/i.test(nextStepText);
         if (isNextSomatic) {
           speakFocusBud("Paso completado. Ahora entramos en una pausa somática. Inhala profundo y relaja los hombros.", { force: true });
         } else {
-          // Conexión dinámica con IA: FocusBud reconoce y celebra en voz alta la actividad exacta que dominaste
-          celebrateStepUniversal(completedStepText, nextStepText, task)
-            .then(aiPhrase => {
-              speakFocusBud(aiPhrase, { force: true, rate: 1.03 });
-            })
-            .catch(() => {
-              speakFocusBud("¡Paso dominado con éxito! Mantén el foco en el siguiente.", { force: true, rate: 1.02 });
-            });
+          const clean = completedStepText.replace(/^(\d+\.?\s*|[-•*]\s*)/, '').trim();
+          const match = clean.match(/^([A-ZÁÉÍÓÚÑ]{3,})\s+(.*)/i);
+          const instantPhrase = match
+            ? `¡Excelente al ${match[1].toLowerCase()} ${match[2].slice(0, 38).replace(/[.,;:].*$/, '').trim()}! Vamos por el siguiente paso.`
+            : `¡Paso dominado con éxito! Avanzamos con el siguiente objetivo.`;
+          speakFocusBud(instantPhrase, { force: true, rate: 1.04 });
         }
       }
     }
@@ -2512,46 +2547,42 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                       className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.4)]"
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.min(100, Math.round((currentStepIdx / steps.length) * 100))}%` }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
                     />
                   </div>
                 </div>
 
                 {/* b) Tarjeta de Acción Única */}
-                {/* b) Tarjeta de Acción Única */}
                 <div className="my-auto py-6 flex items-center justify-center flex-1 w-full min-h-[220px]">
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.div
-                      key={`step-card-${currentStepIdx}`}
-                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
-                      className={`w-full p-6 sm:p-8 rounded-3xl backdrop-blur-sm flex flex-col items-center justify-center text-center relative group transition-all duration-300 ${
-                        /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '')
-                          ? 'bg-gradient-to-b from-amber-950/30 via-zinc-950/90 to-zinc-950 border border-amber-500/40 shadow-[0_0_35px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20'
-                          : 'bg-zinc-950/70 border border-zinc-800/80 shadow-2xl hover:border-emerald-500/30'
-                      }`}
-                    >
-                      {/^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? (
-                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono font-semibold uppercase tracking-wider mb-5 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
-                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                          Pausa Somática / Biorregulación
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono font-medium uppercase tracking-wider mb-5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Paso Activo
-                        </div>
-                      )}
+                  <motion.div
+                    key={`step-card-${currentStepIdx}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                    className={`w-full p-6 sm:p-8 rounded-3xl flex flex-col items-center justify-center text-center relative group transition-colors duration-200 ${
+                      /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '')
+                        ? 'bg-gradient-to-b from-amber-950/30 via-zinc-950/90 to-zinc-950 border border-amber-500/40 shadow-[0_0_35px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20'
+                        : 'bg-zinc-950 border border-zinc-800/80 shadow-2xl hover:border-emerald-500/30'
+                    }`}
+                  >
+                    {/^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? (
+                      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono font-semibold uppercase tracking-wider mb-5 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        Pausa Somática / Biorregulación
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono font-medium uppercase tracking-wider mb-5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Paso Activo
+                      </div>
+                    )}
 
-                      <p className={`text-xl sm:text-2xl font-semibold leading-relaxed tracking-tight max-w-md break-words select-text ${
-                        /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? 'text-amber-100 font-medium' : 'text-white'
-                      }`}>
-                        {steps[currentStepIdx] || 'Cargando paso...'}
-                      </p>
-                    </motion.div>
-                  </AnimatePresence>
+                    <p className={`text-xl sm:text-2xl font-semibold leading-relaxed tracking-tight max-w-md break-words select-text ${
+                      /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? 'text-amber-100 font-medium' : 'text-white'
+                    }`}>
+                      {steps[currentStepIdx] || 'Cargando paso...'}
+                    </p>
+                  </motion.div>
                 </div>
 
                 {/* c) Botón de Completado */}
@@ -2599,10 +2630,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               </div>
             ) : steps.length > 0 ? (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="w-full max-w-md mx-auto my-auto p-5 sm:p-6 rounded-3xl bg-zinc-950/95 border border-emerald-500/30 text-center flex flex-col items-center gap-3 shadow-[0_0_50px_rgba(16,185,129,0.15)] relative backdrop-blur-md"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="w-full max-w-md mx-auto my-auto p-5 sm:p-6 rounded-3xl bg-zinc-950 border border-emerald-500/30 text-center flex flex-col items-center gap-3 shadow-[0_0_40px_rgba(16,185,129,0.15)] relative"
               >
                 <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent pointer-events-none rounded-3xl" />
 
@@ -2678,7 +2709,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     <>
       {/* Sensores de hardware permanentes (100% On-Device Zero-Latency) */}
       <video ref={videoRef} className="hidden" playsInline autoPlay muted />
-      <canvas ref={canvasRef} width={1280} height={720} className="hidden" />
+      <canvas ref={canvasRef} width={320} height={240} className="hidden" />
 
       {/* Pantalla Cinemática de Pre-Calentamiento de Hardware (Paso 1) */}
       <PreWarmupScreen
@@ -2708,10 +2739,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           {showSurvey && !isStarted ? (
             <motion.div
               key="stage-survey"
-              initial={{ opacity: 0, scale: 0.97, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: -16, transition: { duration: 0.25 } }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10, transition: { duration: 0.14 } }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="w-full min-h-screen"
             >
               {renderSurveyStage()}
@@ -2721,8 +2752,8 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               key="stage-login"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0, y: -20, transition: { duration: 0.3 } }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
+              exit={{ opacity: 0, transition: { duration: 0.14 } }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="w-full min-h-screen"
             >
               {renderLoginStage()}
@@ -2730,10 +2761,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           ) : appStage === 'BRIEFING' ? (
             <motion.div
               key="stage-briefing"
-              initial={{ opacity: 0, scale: 0.97, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: -16, transition: { duration: 0.25 } }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10, transition: { duration: 0.14 } }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="w-full min-h-screen"
             >
               {renderBriefingStage()}
@@ -2741,10 +2772,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           ) : (
             <motion.div
               key="stage-focus"
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.25 } }}
-              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              exit={{ opacity: 0, transition: { duration: 0.14 } }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
               className="w-full min-h-screen"
             >
               {renderFocusStage()}

@@ -153,7 +153,7 @@ interface KawaiiRewardCelebrationProps {
   comboCount?: number;
 }
 
-export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = ({
+export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = React.memo(({
   isVisible,
   archetypeIndex = 0,
   comboCount = 1
@@ -163,14 +163,14 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = (
     return REWARD_ARCHETYPES[idx];
   }, [archetypeIndex]);
 
-  // Generar 20 partículas orbitales precalculadas (CERO filtros pesados, 100% transform hardware)
+  // Generar 10 partículas orbitales precalculadas (CERO filtros pesados, 100% transform hardware a 60 FPS)
   const particles: ParticleData[] = useMemo(() => {
-    return Array.from({ length: 20 }).map((_, i) => {
-      const angle = (i * 360) / 20 + (Math.sin(i * 1.7) * 10);
-      const distance = 85 + (i % 4) * 28;
-      const size = 11 + (i % 3) * 5;
+    return Array.from({ length: 10 }).map((_, i) => {
+      const angle = (i * 360) / 10 + (Math.sin(i * 1.7) * 8);
+      const distance = 82 + (i % 3) * 26;
+      const size = 12 + (i % 3) * 4;
       const rotation = (i * 54) % 360;
-      const delay = (i % 5) * 0.025;
+      const delay = (i % 3) * 0.015;
       return { id: i, angle, distance, size, rotation, delay };
     });
   }, []);
@@ -239,18 +239,18 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = (
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.12 }}
           className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none select-none overflow-hidden"
         >
           {/* 1. Anillo de Onda de Choque Anime (Shockwave Ring - Acelerado por GPU) */}
           <motion.div
-            initial={{ scale: 0.2, opacity: 0.95 }}
-            animate={{ scale: 2.5, opacity: 0 }}
-            transition={{ duration: 0.95, ease: "easeOut" }}
+            initial={{ scale: 0.35, opacity: 0.9 }}
+            animate={{ scale: 2.2, opacity: 0 }}
+            transition={{ duration: 0.55, ease: "easeOut" }}
             className="absolute w-44 h-44 rounded-full border-2 pointer-events-none"
             style={{
               borderColor: archetype.primaryColor,
-              boxShadow: `0 0 40px ${archetype.glowColor}`,
+              boxShadow: `0 0 28px ${archetype.glowColor}`,
               willChange: 'transform, opacity'
             }}
           />
@@ -266,16 +266,16 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = (
               return (
                 <motion.div
                   key={p.id}
-                  initial={{ x: 0, y: 0, scale: 0, rotate: 0, opacity: 1 }}
+                  initial={{ x: 0, y: 0, scale: 0.2, rotate: 0, opacity: 1 }}
                   animate={{
                     x: targetX,
                     y: targetY,
-                    scale: [0, 1.3, 0.75],
-                    rotate: p.rotation + 180,
+                    scale: [0.2, 1.2, 0.7],
+                    rotate: p.rotation + 140,
                     opacity: [1, 1, 0]
                   }}
                   transition={{
-                    duration: 1.15,
+                    duration: 0.65,
                     delay: p.delay,
                     ease: [0.16, 1, 0.3, 1]
                   }}
@@ -292,35 +292,35 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = (
             })}
           </div>
 
-          {/* 3. Tarjeta de Celebración Kawaii Anime (Pop con rebote de física elástica) */}
+          {/* 3. Tarjeta de Celebración Kawaii Anime (Pop instantáneo sin backdrop-blur pesado) */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.35, y: 50, rotate: -2 }}
-            animate={{ opacity: 1, scale: 1, y: 0, rotate: 0 }}
-            exit={{ opacity: 0, scale: 1.25, y: -20 }}
+            initial={{ opacity: 0, scale: 0.72, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 1.06, y: -10, transition: { duration: 0.12 } }}
             transition={{
               type: "spring",
-              damping: 14,
-              stiffness: 260,
-              mass: 0.8
+              damping: 22,
+              stiffness: 480,
+              mass: 0.45
             }}
-            className="relative px-5 py-5 sm:px-7 sm:py-6 rounded-[2.5rem] bg-zinc-950/95 border-2 shadow-2xl backdrop-blur-xl flex flex-col items-center gap-2.5 w-[92%] max-w-[390px] text-center"
+            className="relative px-5 py-5 sm:px-7 sm:py-6 rounded-[2.5rem] bg-zinc-950 border-2 shadow-2xl flex flex-col items-center gap-2.5 w-[92%] max-w-[390px] text-center"
             style={{
               borderColor: archetype.primaryColor,
-              boxShadow: `0 0 60px ${archetype.glowColor}, inset 0 0 25px rgba(0,0,0,0.85)`,
+              boxShadow: `0 0 36px ${archetype.glowColor}`,
               willChange: 'transform, opacity'
             }}
           >
             {/* Combo Badge Superior */}
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-700/60 shadow-inner">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-700/60">
               {renderIcon(archetype.icon)}
               <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-zinc-300 whitespace-nowrap">
                 PASO SUPERADO • RACHA x{comboCount}
               </span>
             </div>
 
-            {/* Kaomoji Masivo Estilo Anime - En una sola línea sin desbordes */}
+            {/* Kaomoji Masivo Estilo Anime - En una sola línea sin desbordes ni filtros drop-shadow pesados */}
             <div className="space-y-1 my-0.5 w-full flex flex-col items-center">
-              <span className="text-2xl sm:text-3xl font-black drop-shadow-[0_0_20px_rgba(255,255,255,0.6)] whitespace-nowrap tracking-wide leading-normal block select-none">
+              <span className="text-2xl sm:text-3xl font-black whitespace-nowrap tracking-wide leading-normal block select-none text-white">
                 {archetype.kaomoji}
               </span>
               <h3
@@ -328,8 +328,7 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = (
                 style={{
                   background: `linear-gradient(135deg, #ffffff 0%, ${archetype.primaryColor} 60%, ${archetype.accentColor} 100%)`,
                   WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  filter: `drop-shadow(0 0 16px ${archetype.glowColor})`
+                  WebkitTextFillColor: 'transparent'
                 }}
               >
                 {archetype.title}
@@ -340,13 +339,12 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = (
             <div
               className="px-4 py-1.5 rounded-2xl border font-mono text-xs font-black tracking-wider uppercase flex items-center gap-1.5 shadow-lg"
               style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                backgroundColor: '#09090b',
                 borderColor: archetype.primaryColor,
-                color: archetype.primaryColor,
-                boxShadow: `0 0 24px ${archetype.glowColor}`
+                color: archetype.primaryColor
               }}
             >
-              <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '3s' }} />
+              <Sparkles className="w-3.5 h-3.5" />
               <span>{archetype.badge}</span>
             </div>
 
@@ -359,6 +357,8 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = (
       )}
     </AnimatePresence>
   );
-};
+});
+
+KawaiiRewardCelebration.displayName = 'KawaiiRewardCelebration';
 
 export default KawaiiRewardCelebration;

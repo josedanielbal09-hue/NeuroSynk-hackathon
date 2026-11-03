@@ -25,11 +25,12 @@ export const PreWarmupScreen: React.FC<PreWarmupScreenProps> = ({
   const [dots, setDots] = useState('');
 
   useEffect(() => {
+    if (!isVisible) return;
     const interval = setInterval(() => {
       setDots(prev => (prev.length >= 3 ? '' : prev + '.'));
     }, 400);
     return () => clearInterval(interval);
-  }, []);
+  }, [isVisible]);
 
   return (
     <AnimatePresence>
