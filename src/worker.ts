@@ -24,8 +24,29 @@ const CORS_HEADERS = {
 const DEFAULT_BASETEN_KEY = atob("YjEwX2M3ZnUxMmYzLkRwb3Q4NTRhcnNwQ0laY3BrN2NKRVpySEJXN0RTQ2kz");
 
 function getEffectiveBasetenKey(env: Env, request?: Request): string {
-  const reqKey = request?.headers.get("x-baseten-key") || request?.headers.get("x-api-key") || "";
-  return (env.BASETEN_API_KEY || reqKey || DEFAULT_BASETEN_KEY).trim();
+  const reqKey = (request?.headers.get("x-baseten-key") || request?.headers.get("x-api-key") || "").trim();
+  // Ignore legacy Gemini keys (AIza...) or malformed keys stored in browser localStorage
+  const validClientBasetenKey = reqKey.startsWith("b10_") ? reqKey : "";
+  return (env.BASETEN_API_KEY || validClientBasetenKey || DEFAULT_BASETEN_KEY).trim();
+}
+
+function extractJsonFromText(raw: string): any {
+  const stripped = raw.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+  const firstBrace = stripped.indexOf("{");
+  const lastBrace = stripped.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    return JSON.parse(stripped.slice(firstBrace, lastBrace + 1));
+  }
+  return JSON.parse(stripped);
+}
+
+function normalizeStepItem(item: any): string {
+  if (typeof item === "string") return item.replace(/\*/g, "").trim();
+  if (item && typeof item === "object") {
+    const candidate = item.step || item.text || item.description || item.action || item.title || item.content || "";
+    return String(candidate).replace(/\*/g, "").trim();
+  }
+  return String(item || "").trim();
 }
 
 async function callAIModel(
@@ -34,45 +55,49 @@ async function callAIModel(
   env: Env,
   request?: Request,
   temperature: number = 0.7,
-  maxTokens: number = 2048
+  maxTokens: number = 4096
 ): Promise<string> {
-  const basetenKey = getEffectiveBasetenKey(env, request);
-  // Meta Muse Spark Open uses internal reasoning_tokens (500-900 tokens) + output tokens,
-  // so max_tokens MUST be >= 2048 so the JSON/text response is NEVER truncated.
-  const effectiveMaxTokens = Math.max(maxTokens, 2048);
+  const primaryKey = getEffectiveBasetenKey(env, request);
+  // Meta Muse Spark Open uses internal reasoning_tokens (500-1500 tokens) + output tokens,
+  // so max_tokens MUST be >= 4096 so complex JSON responses are NEVER truncated.
+  const effectiveMaxTokens = Math.max(maxTokens, 4096);
 
-  // Exclusive call to Baseten (Meta Muse Spark Open) with retry on transient errors
-  if (basetenKey) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const res = await fetch("https://inference.baseten.co/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${basetenKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "meta-models/muse-spark-open-1026",
-            messages: [
-              ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-              { role: "user", content: prompt }
-            ],
-            reasoning_effort: "minimal",
-            temperature,
-            max_tokens: effectiveMaxTokens
-          })
-        });
-        if (res.ok) {
-          const data: any = await res.json();
-          const content = data.choices?.[0]?.message?.content || "";
-          const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-          if (clean.length > 0) return clean;
-        } else {
-          console.warn("[Worker AI] Baseten status:", res.status);
-        }
-      } catch (e) {
-        console.warn("[Worker AI] Baseten error:", e);
+  // Exclusive call to Baseten (Meta Muse Spark Open) with automatic fallback to server DEFAULT_BASETEN_KEY on 401/403
+  const keysToTry = primaryKey !== DEFAULT_BASETEN_KEY
+    ? [primaryKey, DEFAULT_BASETEN_KEY]
+    : [DEFAULT_BASETEN_KEY, DEFAULT_BASETEN_KEY];
+
+  for (let attempt = 0; attempt < keysToTry.length; attempt++) {
+    const activeKey = keysToTry[attempt];
+    if (!activeKey) continue;
+    try {
+      const res = await fetch("https://inference.baseten.co/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${activeKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "meta-models/muse-spark-open-1026",
+          messages: [
+            ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+            { role: "user", content: prompt }
+          ],
+          reasoning_effort: "minimal",
+          temperature,
+          max_tokens: effectiveMaxTokens
+        })
+      });
+      if (res.ok) {
+        const data: any = await res.json();
+        const content = data.choices?.[0]?.message?.content || "";
+        const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        if (clean.length > 0) return clean;
+      } else {
+        console.warn("[Worker AI] Baseten status:", res.status);
       }
+    } catch (e) {
+      console.warn("[Worker AI] Baseten error:", e);
     }
   }
 
@@ -125,20 +150,18 @@ export default {
 Diseña una encuesta de calibración rápida de 5 preguntas breves y específicas sobre la meta del usuario: "${task}".
 Cada pregunta debe tener exactamente 3 opciones concretas.
 Responde ÚNICAMENTE con un objeto JSON válido con la clave "questions": array de 5 objetos { "id": "q1".."q5", "question": string, "options": string[3] }.`;
-          const text = await callAIModel(`Meta: "${task}"`, sys, env, request, 0.7, 750);
-          const match = text.match(/\{[\s\S]*\}/);
-          if (match) {
-            const data = JSON.parse(match[0]);
-            if (Array.isArray(data.questions) && data.questions.length >= 3) {
-              const sanitized = data.questions.map((q: any, i: number) => ({
-                id: q.id || `q${i + 1}`,
-                question: String(q.question || "Pregunta de calibración"),
-                options: Array.isArray(q.options) && q.options.length >= 2
-                  ? q.options.map(String)
-                  : ["Opción A", "Opción B", "Opción C"]
-              }));
-              return Response.json({ questions: sanitized }, { headers: CORS_HEADERS });
-            }
+          const text = await callAIModel(`Meta: "${task}"`, sys, env, request, 0.7, 4096);
+          const data = extractJsonFromText(text);
+          const rawQuestions = data?.questions || data?.preguntas || (Array.isArray(data) ? data : null);
+          if (Array.isArray(rawQuestions) && rawQuestions.length >= 3) {
+            const sanitized = rawQuestions.map((q: any, i: number) => ({
+              id: q.id || `q${i + 1}`,
+              question: String(q.question || q.pregunta || "Pregunta de calibración"),
+              options: Array.isArray(q.options || q.opciones) && (q.options || q.opciones).length >= 2
+                ? (q.options || q.opciones).map(String)
+                : ["Opción A", "Opción B", "Opción C"]
+            }));
+            return Response.json({ questions: sanitized }, { headers: CORS_HEADERS });
           }
         } catch (e) {
           console.warn("[Worker /api/task-survey fallback]:", e);
@@ -179,12 +202,13 @@ REGLAS OBLIGATORIAS:
 4. Responde ÚNICAMENTE con un JSON válido con la clave "steps": array de strings.`;
 
           const prompt = `Meta: "${task}"\nRespuestas del usuario: ${JSON.stringify(answers)}\nContexto adicional: ${context}`;
-          const text = await callAIModel(prompt, sys, env, request);
-          const match = text.match(/\{[\s\S]*\}/);
-          if (match) {
-            const data = JSON.parse(match[0]);
-            if (Array.isArray(data.steps) && data.steps.length >= 3) {
-              return Response.json({ steps: data.steps }, { headers: CORS_HEADERS });
+          const text = await callAIModel(prompt, sys, env, request, 0.7, 4096);
+          const data = extractJsonFromText(text);
+          const rawSteps = data?.steps || data?.pasos || data?.micro_steps || (Array.isArray(data) ? data : null);
+          if (Array.isArray(rawSteps) && rawSteps.length >= 2) {
+            const normalized = rawSteps.map(normalizeStepItem).filter(Boolean);
+            if (normalized.length >= 2) {
+              return Response.json({ steps: normalized }, { headers: CORS_HEADERS });
             }
           }
         } catch (e) {
@@ -214,7 +238,7 @@ REGLAS OBLIGATORIAS:
           const sys = `Eres FocusBud de NeuroSynk. El usuario acaba de completar un micropaso.
 Formula una frase breve, entusiasta, humana y motivadora (máximo 12 palabras) que reconozca la acción dominada.
 Sin comillas, sin asteriscos. En español.`;
-          const text = await callAIModel(`Paso completado: "${completed}"`, sys, env, request, 0.8, 550);
+          const text = await callAIModel(`Paso completado: "${completed}"`, sys, env, request, 0.8, 4096);
           const cleanText = text.replace(/["*]/g, '').trim();
           if (cleanText.length > 5) {
             return Response.json({ phrase: cleanText }, { headers: CORS_HEADERS });
@@ -246,12 +270,13 @@ El usuario se siente bloqueado o abrumado por este paso: "${parent}".
 Fragmenta este paso en exactamente 3 nano-pasos atómicos ejecutables en menos de 60 segundos cada uno.
 Cada nano-paso DEBE comenzar con un VERBO EN MAYÚSCULAS.
 Responde ÚNICAMENTE en JSON con la clave "subSteps": array de 3 strings.`;
-          const text = await callAIModel(`Paso bloqueado: "${parent}"`, sys, env, request);
-          const match = text.match(/\{[\s\S]*\}/);
-          if (match) {
-            const data = JSON.parse(match[0]);
-            if (Array.isArray(data.subSteps) && data.subSteps.length === 3) {
-              return Response.json({ subSteps: data.subSteps }, { headers: CORS_HEADERS });
+          const text = await callAIModel(`Paso bloqueado: "${parent}"`, sys, env, request, 0.7, 4096);
+          const data = extractJsonFromText(text);
+          const rawSub = data?.subSteps || data?.steps || data?.nanoSteps || (Array.isArray(data) ? data : null);
+          if (Array.isArray(rawSub) && rawSub.length >= 2) {
+            const normalized = rawSub.map(normalizeStepItem).filter(Boolean).slice(0, 4);
+            if (normalized.length >= 2) {
+              return Response.json({ subSteps: normalized }, { headers: CORS_HEADERS });
             }
           }
         } catch {}
@@ -282,13 +307,14 @@ Responde ÚNICAMENTE en JSON con la clave "subSteps": array de 3 strings.`;
           const sys = `Eres Muse Wonder de Meta. Descompón la tarea "${task}" en 3 nano-pasos ejecutables en menos de 60 segundos cada uno.
 Cada nano-paso DEBE iniciar con un VERBO EN MAYÚSCULAS.
 Responde ÚNICAMENTE con un JSON con las claves "nanoSteps" (array de 3 strings) y "estimatedSecondsPerStep" (número 30 a 60).`;
-          const text = await callAIModel(`Tarea: "${task}"`, sys, env, request);
-          const match = text.match(/\{[\s\S]*\}/);
-          if (match) {
-            const data = JSON.parse(match[0]);
-            if (Array.isArray(data.nanoSteps) && data.nanoSteps.length > 0) {
+          const text = await callAIModel(`Tarea: "${task}"`, sys, env, request, 0.7, 4096);
+          const data = extractJsonFromText(text);
+          const rawNano = data?.nanoSteps || data?.steps || data?.subSteps || (Array.isArray(data) ? data : null);
+          if (Array.isArray(rawNano) && rawNano.length > 0) {
+            const normalized = rawNano.map(normalizeStepItem).filter(Boolean);
+            if (normalized.length > 0) {
               return Response.json({
-                nanoSteps: data.nanoSteps,
+                nanoSteps: normalized,
                 estimatedSecondsPerStep: data.estimatedSecondsPerStep || 45
               }, { headers: CORS_HEADERS });
             }

@@ -934,7 +934,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       );
 
       if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
-        resolvedSteps = data.steps.map((s: string) => s.replace(/(Paso \d+:)/i, '').trim());
+        resolvedSteps = data.steps.map((s: any) => String(typeof s === 'string' ? s : (s?.step || s?.text || s?.description || s?.action || s || '')).replace(/(Paso \d+:)/i, '').trim()).filter(Boolean);
       } else {
         throw new Error("Formato de respuesta incorrecto");
       }
@@ -1041,7 +1041,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       );
 
       if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
-        resolvedSteps = data.steps.map((s: string) => s.replace(/(Paso \d+:)/i, '').trim());
+        resolvedSteps = data.steps.map((s: any) => String(typeof s === 'string' ? s : (s?.step || s?.text || s?.description || s?.action || s || '')).replace(/(Paso \d+:)/i, '').trim()).filter(Boolean);
       } else {
         throw new Error("Formato de respuesta incorrecto");
       }

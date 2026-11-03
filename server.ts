@@ -125,9 +125,9 @@ async function callMetaModel(params: MetaCallParams): Promise<string> {
   if (BASETEN_API_KEY) {
     try {
       const basetenUrl = process.env.BASETEN_ENDPOINT_URL || "https://inference.baseten.co/v1/chat/completions";
-      // Meta Muse Spark Open uses 500-900 internal reasoning_tokens + output tokens,
-      // so tokenBudget MUST be >= 2048 so JSON responses are never truncated.
-      const tokenBudget = Math.max(params.maxTokens ?? 2048, 2048);
+      // Meta Muse Spark Open uses 500-1500 internal reasoning_tokens + output tokens,
+      // so tokenBudget MUST be >= 4096 so JSON responses are never truncated.
+      const tokenBudget = Math.max(params.maxTokens ?? 4096, 4096);
       const basetenRes = await fetchWithRetry(basetenUrl, {
         method: "POST",
         headers: {

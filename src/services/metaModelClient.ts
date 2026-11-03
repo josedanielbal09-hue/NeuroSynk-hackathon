@@ -90,12 +90,11 @@ export async function testMetaModelConnection(apiKey?: string): Promise<{ succes
 export const testGeminiConnection = testMetaModelConnection;
 
 function getClientApiKey(explicitKey?: string): string {
-  if (explicitKey && explicitKey.trim()) return explicitKey.trim();
-  if (typeof localStorage !== 'undefined') {
-    const stored = localStorage.getItem('gemini_api_key');
-    if (stored && stored.trim()) return stored.trim();
-  }
-  return '';
+  const candidate = (explicitKey && explicitKey.trim())
+    ? explicitKey.trim()
+    : (typeof localStorage !== 'undefined' ? (localStorage.getItem('gemini_api_key') || '').trim() : '');
+  // Only forward valid Baseten keys (b10_...) so legacy Gemini keys (AIza...) in localStorage never cause 401/403 on Baseten
+  return candidate.startsWith('b10_') ? candidate : '';
 }
 
 export async function chatUniversal(
