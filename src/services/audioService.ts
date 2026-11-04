@@ -15,7 +15,7 @@ class AudioService {
   private muted: boolean = false;
 
   /**
-   * Obtiene o inicializa perezosamente el AudioContext nativo de Web Audio API.
+   * Lazily initializes or retrieves the native Web Audio API AudioContext.
    */
   private getAudioContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -32,7 +32,7 @@ class AudioService {
 
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       this.audioCtx.resume().catch(() => {
-        // Ignora silenciosamente si aún no ha ocurrido interacción de usuario
+        // Silently ignore if user interaction hasn't happened yet
       });
     }
 
@@ -40,7 +40,7 @@ class AudioService {
   }
 
   /**
-   * Alterna el estado global de silencio del audio.
+   * Toggles global audio mute state.
    */
   public toggleMute(): boolean {
     this.muted = !this.muted;
@@ -48,21 +48,21 @@ class AudioService {
   }
 
   /**
-   * Indica si el servicio de audio se encuentra en silencio.
+   * Indicates whether audio is currently muted.
    */
   public isMuted(): boolean {
     return this.muted;
   }
 
   /**
-   * Establece explícitamente el estado de silencio.
+   * Explicitly sets mute state.
    */
   public setMuted(muted: boolean): void {
     this.muted = muted;
   }
 
   /**
-   * Reproduce notas armónicas sintetizadas mediante Web Audio API pura.
+   * Plays synthesized harmonic notes via pure Web Audio API.
    */
   private playHarmonicNotes(notes: NoteSpec[], defaultType: OscillatorType = 'sine'): void {
     const ctx = this.getAudioContext();
@@ -102,7 +102,7 @@ class AudioService {
   }
 
   /**
-   * Reproduce el sonido de estado sintetizado ("Earcon") según el estado de FocusBud.
+   * Plays synthesized state sound ("Earcon") matching FocusBud's state.
    */
   public playStateSound(state: FocusState): void {
     if (this.muted) return;
@@ -113,21 +113,19 @@ class AudioService {
     const now = Date.now();
     const lastPlayed = this.lastPlayedMap.get(state) || 0;
 
-    // Regla anti-fatiga con cooldown por estado
+    // Anti-fatigue per-state cooldown
     if (config.cooldown > 0 && now - lastPlayed < config.cooldown) {
       return;
     }
 
     switch (state) {
       case 'ENFOQUE':
-        // ENFOQUE: Tono armónico tenue y casi imperceptible de inicio (sine 440 Hz suave)
         this.playHarmonicNotes([
           { freq: 440.0, type: 'sine', startTimeOffset: 0, duration: 0.25, gain: 0.06 },
         ]);
         break;
 
       case 'ALERTA_SUAVE':
-        // ALERTA_SUAVE: Dos pings suaves armónicos (528 Hz y 659 Hz) con envolvente suave de ganancia
         this.playHarmonicNotes([
           { freq: 528.0, type: 'sine', startTimeOffset: 0, duration: 0.3, gain: 0.1 },
           { freq: 659.0, type: 'sine', startTimeOffset: 0.12, duration: 0.35, gain: 0.1 },
@@ -135,14 +133,12 @@ class AudioService {
         break;
 
       case 'FATIGA':
-        // FATIGA: Tono grave y cálido descendente de baja intensidad (330 Hz -> 220 Hz)
         this.playHarmonicNotes([
           { freq: 330.0, endFreq: 220.0, type: 'triangle', startTimeOffset: 0, duration: 0.5, gain: 0.09 },
         ], 'triangle');
         break;
 
       case 'PARALISIS':
-        // PARALISIS: Tríada reconfortante en modo sostenido (Do4 261.63Hz, Mi4 329.63Hz, Sol4 392Hz)
         this.playHarmonicNotes([
           { freq: 261.63, type: 'sine', startTimeOffset: 0, duration: 0.7, gain: 0.08 },
           { freq: 329.63, type: 'sine', startTimeOffset: 0, duration: 0.7, gain: 0.08 },
@@ -151,7 +147,6 @@ class AudioService {
         break;
 
       case 'CELEBRACION':
-        // CELEBRACION: Arpegio brillante ascendente en Do Mayor con notas cortas y festivas (Do5, Mi5, Sol5, Do6)
         this.playHarmonicNotes([
           { freq: 523.25, type: 'sine', startTimeOffset: 0, duration: 0.15, gain: 0.12 },
           { freq: 659.25, type: 'sine', startTimeOffset: 0.07, duration: 0.15, gain: 0.13 },
@@ -161,7 +156,6 @@ class AudioService {
         break;
 
       case 'PAUSA':
-        // PAUSA: Tono suave relajante
         this.playHarmonicNotes([
           { freq: 392.0, type: 'sine', startTimeOffset: 0, duration: 0.3, gain: 0.08 },
           { freq: 493.88, type: 'sine', startTimeOffset: 0.1, duration: 0.4, gain: 0.08 },
@@ -173,8 +167,8 @@ class AudioService {
   }
 
   /**
-   * Sintetiza voz empática en español usando Web Speech API nativa.
-   * Adapta automáticamente el rate (velocidad) y tono (pitch) para sonar cálido y humano.
+   * Synthesizes empathetic English voice using native Web Speech API.
+   * Adapts rate and pitch automatically to sound warm and human.
    */
   public speak(
     text: string,
@@ -192,25 +186,24 @@ class AudioService {
     }
 
     try {
-      // Cancelar cualquier alocución anterior para evitar superposiciones
+      // Cancel any previous utterance to prevent overlap
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = window.speechSynthesis.getVoices();
 
-      // Buscar voz nativa en español
-      const spanishVoice = voices.find(v =>
-        v.lang.toLowerCase().startsWith('es-mx') ||
-        v.lang.toLowerCase().startsWith('es-es') ||
-        v.lang.toLowerCase().startsWith('es-us') ||
-        v.lang.toLowerCase().startsWith('es')
+      // Find native English voice
+      const englishVoice = voices.find(v =>
+        v.lang.toLowerCase().startsWith('en-us') ||
+        v.lang.toLowerCase().startsWith('en-gb') ||
+        v.lang.toLowerCase().startsWith('en')
       );
 
-      if (spanishVoice) {
-        utterance.voice = spanishVoice;
+      if (englishVoice) {
+        utterance.voice = englishVoice;
       }
-      utterance.lang = spanishVoice ? spanishVoice.lang : 'es-MX';
-      utterance.rate = options?.rate ?? 0.95;
+      utterance.lang = englishVoice ? englishVoice.lang : 'en-US';
+      utterance.rate = options?.rate ?? 0.98;
       utterance.pitch = options?.pitch ?? 1.05;
       utterance.volume = options?.volume ?? 0.95;
 
@@ -223,19 +216,19 @@ class AudioService {
       };
 
       utterance.onerror = (e) => {
-        console.warn('[AudioService] Evento de error en habla:', e);
+        console.warn('[AudioService] Speech error event:', e);
         if (options?.onEnd) options.onEnd();
       };
 
       window.speechSynthesis.speak(utterance);
     } catch (err) {
-      console.warn('[AudioService] Error al sintetizar voz:', err);
+      console.warn('[AudioService] Error synthesizing speech:', err);
       if (options?.onEnd) options.onEnd();
     }
   }
 
   /**
-   * Detiene de inmediato cualquier alocución en curso.
+   * Immediately stops any ongoing speech utterance.
    */
   public stopSpeaking(): void {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -245,4 +238,3 @@ class AudioService {
 }
 
 export const audioService = new AudioService();
-

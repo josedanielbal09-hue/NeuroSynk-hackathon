@@ -165,7 +165,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(({ state, message, class
           {/* Capa 2a: Ojos Verdes (ENFOQUE / CELEBRACION) */}
           <img
             src={ojosVerdesImg}
-            alt="FocusBud Ojos Verdes"
+            alt="FocusBud Green Eyes"
             className={`absolute inset-0 w-full h-full object-contain pointer-events-none z-10 transition-opacity duration-500 ease-in-out ${
               visuals.eyes === 'ojos_verdes.png' && !isBlinking ? 'opacity-100' : 'opacity-0'
             }`}
@@ -174,7 +174,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(({ state, message, class
           {/* Capa 2b: Ojos Ámbar (ALERTA_SUAVE) */}
           <img
             src={ojosAmbarImg}
-            alt="FocusBud Ojos Ámbar"
+            alt="FocusBud Amber Eyes"
             className={`absolute inset-0 w-full h-full object-contain pointer-events-none z-10 transition-opacity duration-500 ease-in-out ${
               visuals.eyes === 'ojos_ambar.png' && !isBlinking ? 'opacity-100' : 'opacity-0'
             }`}
@@ -183,7 +183,7 @@ export const Avatar: React.FC<AvatarProps> = React.memo(({ state, message, class
           {/* Capa 2c: Ojos Cansados (FATIGA / PARALISIS / PAUSA) */}
           <img
             src={ojosCansadosImg}
-            alt="FocusBud Ojos Cansados"
+            alt="FocusBud Tired Eyes"
             className={`absolute inset-0 w-full h-full object-contain pointer-events-none z-10 transition-opacity duration-500 ease-in-out ${
               visuals.eyes === 'ojos_cansados.png' && !isBlinking ? 'opacity-100' : 'opacity-0'
             }`}

@@ -17,29 +17,41 @@ interface GeminiHeroInputProps {
   onToggleSidebar?: () => void;
 }
 
+const WORK_MODE_LABELS: Record<'pantalla' | 'lectura' | 'flexible', string> = {
+  pantalla: 'Screen',
+  lectura: 'Reading',
+  flexible: 'Flexible'
+};
+
+const SENSITIVITY_LABELS: Record<'estricto' | 'normal' | 'relajado', string> = {
+  estricto: 'Strict',
+  normal: 'Balanced',
+  relajado: 'Relaxed'
+};
+
 const QUICK_PROMPTS = [
   {
     icon: Target,
-    label: "Modo Enfoque",
-    text: "Completar mi entregable prioritario de la jornada",
+    label: "Focus Mode",
+    text: "Complete my top priority deliverable for today",
     color: "from-emerald-500/20 to-emerald-500/5 text-emerald-300 border-emerald-500/30"
   },
   {
     icon: Zap,
-    label: "Sprint 25m",
-    text: "Sprint de 25 minutos para avanzar sin distracciones",
+    label: "25m Sprint",
+    text: "25-minute distraction-free focus sprint",
     color: "from-amber-500/20 to-amber-500/5 text-amber-300 border-amber-500/30"
   },
   {
     icon: Layers,
-    label: "Desglose Atómico",
-    text: "Estructurar y desglosar un tema complejo en micropasos",
+    label: "Atomic Breakdown",
+    text: "Structure and break down a complex topic into micro-steps",
     color: "from-purple-500/20 to-purple-500/5 text-purple-300 border-purple-500/30"
   },
   {
     icon: BookOpen,
-    label: "Lectura Profunda",
-    text: "Lectura crítica y síntesis de apuntes técnicos",
+    label: "Deep Reading",
+    text: "Critical reading and synthesis of technical notes",
     color: "from-cyan-500/20 to-cyan-500/5 text-cyan-300 border-cyan-500/30"
   }
 ];
@@ -90,10 +102,10 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
               type="button"
               onClick={onToggleSidebar}
               className="p-2 sm:p-2.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-sm"
-              title="Abrir Menú & Historial"
+              title="Open Menu & History"
             >
               <Menu className="w-4 h-4 text-emerald-400" />
-              <span className="hidden md:inline font-mono text-[11px] text-zinc-400 font-medium">Menú</span>
+              <span className="hidden md:inline font-mono text-[11px] text-zinc-400 font-medium">Menu</span>
             </button>
           )}
 
@@ -106,18 +118,18 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
             </span>
           </div>
 
-          {/* Calibración Rápida Popover Trigger - Alineado a la izquierda para evitar colisión con audio */}
+          {/* Quick Calibration Popover Trigger */}
           <button
             type="button"
             onClick={() => setShowConfigModal(true)}
             className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800/80 border border-zinc-800 text-xs text-zinc-300 font-medium transition-all shadow-sm hover:border-zinc-700 cursor-pointer active:scale-95"
           >
             <Sliders className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="capitalize">Modo: {workMode} • {sensitivity}</span>
+            <span>Mode: {WORK_MODE_LABELS[workMode] || workMode} • {SENSITIVITY_LABELS[sensitivity] || sensitivity}</span>
           </button>
         </div>
 
-        {/* Espacio derecho libre para controles globales fijos (Ruido Marrón y Estado IA) */}
+        {/* Right spacer for fixed global controls (Brown Noise & AI Status) */}
         <div className="w-64 hidden sm:block" />
       </header>
 
@@ -152,9 +164,9 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-3"
         >
-          ¿Por dónde{' '}
+          Where should we{' '}
           <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-            empezamos hoy?
+            start today?
           </span>
         </motion.h1>
 
@@ -167,10 +179,10 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="text-sm sm:text-base text-zinc-400 max-w-lg mb-8 font-normal leading-relaxed"
         >
-          Introduce tu meta de estudio o trabajo. FocusBud y Meta Muse descompondrán la sesión en bloques guiados con biometría activa.
+          Enter your study or work goal. FocusBud and Meta Muse will break your session into guided blocks with live biometrics.
         </motion.p>
 
-        {/* Main Gemini Capsule Input Form - 100% visible con opacity: 1 */}
+        {/* Main Capsule Input Form */}
         <motion.form
           initial={{ opacity: 0, y: 15 }}
           animate={{
@@ -194,7 +206,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
               disabled={isBusy}
               value={task}
               onChange={e => setTask(e.target.value)}
-              placeholder="Escribe tu objetivo, examen, lectura o proyecto..."
+              placeholder="Enter your goal, exam, reading, or project..."
               className="w-full bg-transparent text-white placeholder-zinc-500 text-sm sm:text-base px-2 py-3 focus:outline-none font-sans font-normal"
             />
 
@@ -206,7 +218,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
                   ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-[0_0_20px_rgba(16,185,129,0.35)] active:scale-95'
                   : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
               }`}
-              title="Calibrar e Iniciar Sesión"
+              title="Calibrate & Start Session"
             >
               {isBusy ? (
                 <div className="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
@@ -225,7 +237,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
               className="mt-4 flex items-center justify-center gap-2.5 text-xs font-mono text-emerald-400 font-medium select-none"
             >
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Sincronizando biometría y estructurando ruta de enfoque...</span>
+              <span>Syncing biometrics and structuring your focus roadmap...</span>
             </motion.div>
           )}
         </motion.form>
@@ -262,7 +274,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
       <footer className="w-full max-w-3xl flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-500 font-mono gap-3 z-10 border-t border-zinc-900/80 pt-4">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-500/80" />
-          <span>Biometría 100% procesada localmente en tu GPU • Privacidad On-Device</span>
+          <span>100% GPU-processed local biometrics • On-Device Privacy</span>
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
@@ -290,7 +302,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
               <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                 <div className="flex items-center gap-2.5">
                   <Sliders className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-white font-semibold text-sm">Calibración de Entorno</h3>
+                  <h3 className="text-white font-semibold text-sm">Environment Calibration</h3>
                 </div>
                 <button
                   type="button"
@@ -304,12 +316,12 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
               {/* Work Mode Selector */}
               <div>
                 <label className="text-xs font-mono uppercase text-zinc-400 tracking-wider block mb-2">
-                  Perfil de Actividad:
+                  Activity Profile:
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'pantalla', label: 'Pantalla', icon: Laptop },
-                    { id: 'lectura', label: 'Lectura', icon: BookOpen },
+                    { id: 'pantalla', label: 'Screen', icon: Laptop },
+                    { id: 'lectura', label: 'Reading', icon: BookOpen },
                     { id: 'flexible', label: 'Flexible', icon: Shuffle }
                   ].map(item => {
                     const Icon = item.icon;
@@ -336,13 +348,13 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
               {/* Sensitivity Selector */}
               <div>
                 <label className="text-xs font-mono uppercase text-zinc-400 tracking-wider block mb-2">
-                  Tolerancia de Alertas IA:
+                  AI Alert Tolerance:
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'estricto', label: 'Estricto', desc: 'Rápido' },
-                    { id: 'normal', label: 'Equilibrado', desc: 'Estándar' },
-                    { id: 'relajado', label: 'Relajado', desc: 'Permisivo' }
+                    { id: 'estricto', label: 'Strict', desc: 'Fast' },
+                    { id: 'normal', label: 'Balanced', desc: 'Standard' },
+                    { id: 'relajado', label: 'Relaxed', desc: 'Gentle' }
                   ].map(item => {
                     const isSelected = sensitivity === item.id;
                     return (
@@ -369,7 +381,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
                 onClick={() => setShowConfigModal(false)}
                 className="w-full mt-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs rounded-xl transition-all uppercase tracking-wider cursor-pointer"
               >
-                Confirmar Ajustes
+                Confirm Settings
               </button>
             </motion.div>
           </motion.div>

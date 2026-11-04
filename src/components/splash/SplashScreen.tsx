@@ -71,7 +71,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
 
           <div className="flex flex-col items-center gap-1.5">
             <span className="font-mono text-xs tracking-[0.25em] text-green-500 uppercase font-semibold animate-pulse">
-              Conectando Enlaces...
+              Connecting Neural Links...
             </span>
             <span className="font-mono text-[10px] text-zinc-600 tracking-wider">
               {Math.round(loadingProgress)}%

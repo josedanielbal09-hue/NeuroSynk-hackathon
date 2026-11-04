@@ -62,7 +62,7 @@ function NeuroMascot({ expression = 'normal', size = 120 }: NeuroMascotProps) {
       viewBox="0 0 100 100"
       className="drop-shadow-[0_0_25px_rgba(34,197,94,0.5)] transition-all duration-300"
     >
-      {/* Cuerpo circular negro con contorno verde neón */}
+      {/* Circular dark body with neon green outline */}
       <circle
         cx="50"
         cy="50"
@@ -72,11 +72,11 @@ function NeuroMascot({ expression = 'normal', size = 120 }: NeuroMascotProps) {
         strokeWidth="4"
       />
 
-      {/* Ojos expresivos minimalistas */}
+      {/* Minimalist expressive eyes */}
       <g>
         {expression === 'normal' && (
           <>
-            {/* Ojo izquierdo */}
+            {/* Left eye */}
             <motion.ellipse
               cx="36"
               cy="48"
@@ -87,7 +87,7 @@ function NeuroMascot({ expression = 'normal', size = 120 }: NeuroMascotProps) {
               animate={{ scaleY: [1, 1, 0.1, 1, 1] }}
               transition={{ repeat: Infinity, duration: 3, repeatDelay: 1.5 }}
             />
-            {/* Ojo derecho */}
+            {/* Right eye */}
             <motion.ellipse
               cx="64"
               cy="48"
@@ -141,15 +141,24 @@ function NeuroMascot({ expression = 'normal', size = 120 }: NeuroMascotProps) {
 
 const mapAIPredictionToAvatarState = (className?: string): FocusState => {
   switch (className) {
+    case 'DEEP FOCUS (FLOW)':
+    case 'NORMAL STUDY / NEUTRAL':
+    case 'FOCUS':
     case 'ENFOQUE PROFUNDO (FLOW)':
     case 'ESTUDIO NORMAL / NEUTRO':
     case 'ENFOQUE':
       return 'ENFOQUE';
+    case 'DISTRACTION':
+    case 'COGNITIVE DISTRACTION':
+    case 'OVERSTIMULATION':
     case 'DISTRACCIÓN':
     case 'SOBREESTIMULACIÓN':
       return 'ALERTA_SUAVE';
+    case 'FATIGUE':
+    case 'EYE FATIGUE / DROWSINESS':
     case 'FATIGA':
       return 'FATIGA';
+    case 'POSTURAL STRAIN':
     case 'AGOBIO POSTURAL':
       return 'PARALISIS';
     default:
@@ -166,47 +175,47 @@ interface SurveyQuestion {
 const DEFAULT_SURVEY_QUESTIONS: SurveyQuestion[] = [
   {
     id: "q1",
-    question: "¿Cuánto tiempo dedicarás a esta sesión?",
+    question: "How much time will you dedicate to this session?",
     options: [
-      "25 a 30 minutos (Sprint corto)",
-      "45 a 60 minutos (Sesión estándar)",
-      "90 a 120 minutos (Sesión profunda)"
+      "25 to 30 minutes (Short sprint)",
+      "45 to 60 minutes (Standard session)",
+      "90 to 120 minutes (Deep session)"
     ]
   },
   {
     id: "q2",
-    question: "¿Qué avance tangible buscas lograr al concluir este tiempo?",
+    question: "What tangible outcome do you want to achieve by the end of this block?",
     options: [
-      "Comprender la idea central",
-      "Resolver un ejercicio o sección",
-      "Completar una entrega formal"
+      "Understand the core concept",
+      "Solve an exercise or section",
+      "Complete a formal deliverable"
     ]
   },
   {
     id: "q3",
-    question: "¿Cuál es tu nivel de familiaridad o preparación con los materiales?",
+    question: "What is your familiarity or preparation level with the materials?",
     options: [
-      "Parto desde cero absoluto",
-      "Tengo bases y notas listas",
-      "Domino el tema, voy a producir"
+      "Starting completely from scratch",
+      "I have basics and notes ready",
+      "I master the topic, ready to produce"
     ]
   },
   {
     id: "q4",
-    question: "¿Cómo describirías tu nivel de energía y foco en este momento?",
+    question: "How would you describe your energy and focus right now?",
     options: [
-      "Alta energía y foco despejado",
-      "Energía media / neutra",
-      "Mente dispersa o fatiga inicial"
+      "High energy and clear focus",
+      "Moderate / neutral energy",
+      "Scattered mind or initial fatigue"
     ]
   },
   {
     id: "q5",
-    question: "¿En qué momento sueles experimentar mayor fricción o bloqueo?",
+    question: "At what point do you usually experience the most friction or block?",
     options: [
-      "Al romper la inercia del inicio",
-      "A la mitad con la densidad técnica",
-      "Al cerrar y pulir detalles finales"
+      "Breaking initial starting inertia",
+      "Midway through dense technical material",
+      "Wrapping up and polishing final details"
     ]
   }
 ];
@@ -220,13 +229,13 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
 
-  // Estados de la Encuesta Dinámica de Calibración de Contexto
+  // Dynamic Context Calibration Survey States
   const [surveyQuestions, setSurveyQuestions] = useState<SurveyQuestion[]>([]);
   const [surveyAnswers, setSurveyAnswers] = useState<Record<string, string>>({});
   const [showSurvey, setShowSurvey] = useState<boolean>(false);
   const [isSurveyLoading, setIsSurveyLoading] = useState<boolean>(false);
 
-  // Temporizador Pomodoro Adaptable
+  // Adaptive Pomodoro Timer
   const [workDuration, setWorkDuration] = useState<number>(25 * 60);
   const [breakDuration, setBreakDuration] = useState<number>(5 * 60);
   const [timerMode, setTimerMode] = useState<TimerMode>('WORK');
@@ -235,7 +244,7 @@ export default function App() {
   const [completedBlocks, setCompletedBlocks] = useState<number>(0);
   const [totalTargetBlocks, setTotalTargetBlocks] = useState<number>(2);
 
-  // Configuración de audio
+  // Audio configuration
   const [isBrownNoiseActive, setIsBrownNoiseActive] = useState<boolean>(false);
   const [noiseVolume, setNoiseVolume] = useState<number>(0.3);
   const [isTimerConfigOpen, setIsTimerConfigOpen] = useState<boolean>(false);
@@ -244,9 +253,9 @@ export default function App() {
   const [isPreWarmupVisible, setIsPreWarmupVisible] = useState(true);
   const [warmupProgress, setWarmupProgress] = useState(25);
   const [warmupSteps, setWarmupSteps] = useState<WarmupStep[]>([
-    { id: 'webgl', label: 'Motor Neural WebGL (TensorFlow.js)', status: 'loading', detail: 'COMPILANDO' },
-    { id: 'mediapipe', label: 'Visión Biomecánica (MediaPipe Holistic)', status: 'pending' },
-    { id: 'camera', label: 'Sensor Óptico y Calibración Basal', status: 'pending' }
+    { id: 'webgl', label: 'WebGL Neural Engine (TensorFlow.js)', status: 'loading', detail: 'COMPILING' },
+    { id: 'mediapipe', label: 'Biomechanical Vision (MediaPipe Holistic)', status: 'pending' },
+    { id: 'camera', label: 'Optical Sensor & Baseline Calibration', status: 'pending' }
   ]);
   const hasFirstLandmarkRef = useRef(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -267,7 +276,7 @@ export default function App() {
   const currentSessionIdRef = useRef<string | null>(null);
 
   const handleStartNewSession = () => {
-    // Si la sesión anterior tuvo avance, asegurar que quede grabada en el historial
+    // If previous session had progress, save it to local history
     if (currentSessionIdRef.current && (elapsedTimeRef.current > 15 || currentStepIdx > 0)) {
       const focusHistory = focusSamplesRef.current;
       const avgFocus = focusHistory.length > 0
@@ -275,7 +284,7 @@ export default function App() {
         : Math.round(metricsRef.current.nivel_clap);
       saveSessionItem({
         id: currentSessionIdRef.current,
-        task: task || 'Sesión de Trabajo',
+        task: task || 'Work Session',
         timestamp: Date.now(),
         durationMinutes: Math.max(1, Math.round(elapsedTimeRef.current / 60)),
         completedSteps: currentStepIdx,
@@ -332,14 +341,14 @@ export default function App() {
 
   // Chat States
   const [chatMessages, setChatMessages] = useState<{ role: string, content: string }[]>([
-    { role: 'assistant', content: '¿Duda rápida? Pregunta y no pierdas el flujo.' }
+    { role: 'assistant', content: 'Quick question? Ask away without breaking your flow.' }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // NÚCLEO PDEF v1.0 State
+  // PDEF v1.0 Core State
   const metricsRef = useRef({
     blinks: [] as number[],
     is_blinking: false,
@@ -363,7 +372,7 @@ export default function App() {
     baseline_yaw: 0.5,
     baseline_pitch: 0.5,
 
-    // Subdivisión de tareas
+    // Task subdivision
     subdivided_indexes: [] as number[],
     is_subdividing: false,
 
@@ -372,7 +381,7 @@ export default function App() {
     nivel_carga: 0.0,
   });
 
-  // Estado del Motor de Red Neuronal TensorFlow.js
+  // TensorFlow.js Neural Network Engine State
   const [isAIBrainReady, setIsAIBrainReady] = useState(false);
   const [aiPrediction, setAiPrediction] = useState<AIPredictionResult | null>(null);
   const windowFramesRef = useRef<{ ear: number; yaw: number; pitch: number; frown: number; noseDelta: number; gazeVar: number; shoulder: number; mar: number; roll: number; t: number }[]>([]);
@@ -382,18 +391,18 @@ export default function App() {
   const pendingClassRef = useRef<number | null>(null);
   const pendingClassSinceRef = useRef<number>(0);
 
-  // Carga inicial del cerebro IA y pre-compilación de shaders WebGL
+  // Initial AI brain load & WebGL shader pre-compilation
   useEffect(() => {
     loadNeuroSynkBrain().then(res => {
       setIsAIBrainReady(res.isReady);
       if (res.isReady) {
-        setWarmupSteps(prev => prev.map(s => s.id === 'webgl' ? { ...s, status: 'completed', detail: '60 FPS' } : (s.id === 'mediapipe' ? { ...s, status: 'loading', detail: 'WASM ACTIVO' } : s)));
+        setWarmupSteps(prev => prev.map(s => s.id === 'webgl' ? { ...s, status: 'completed', detail: '60 FPS' } : (s.id === 'mediapipe' ? { ...s, status: 'loading', detail: 'WASM ACTIVE' } : s)));
         setWarmupProgress(prev => Math.max(prev, 50));
       }
     });
   }, []);
 
-  // Estado de higiene postural local determinista (100% Edge Privacy)
+  // Deterministic local postural hygiene state (100% Edge Privacy)
   const [postureHygiene, setPostureHygiene] = useState<{
     status: 'OPTIMAL' | 'NECK_TILT' | 'SHOULDER_TENSION';
     label: string;
@@ -401,26 +410,26 @@ export default function App() {
     bg: string;
   }>({
     status: 'OPTIMAL',
-    label: 'Postura Óptima',
+    label: 'Optimal Posture',
     color: 'text-emerald-400',
     bg: 'bg-emerald-950/40 border-emerald-800/40'
   });
   const lastPostureUpdateRef = useRef<number>(0);
 
-  // Streaming y voz de micro-intervención de Muse Spark hacia FocusBud
+  // Muse Spark streaming & voice micro-intervention to FocusBud
   const isBudStreamingRef = useRef<boolean>(false);
   const [isBudSpeaking, setIsBudSpeaking] = useState<boolean>(false);
   const isBudSpeakingAudioRef = useRef<boolean>(false);
   const lastSpokenTimeRef = useRef<number>(0);
 
   /**
-   * Helper unificado para que FocusBud hable de forma autónoma con síntesis de voz real en español
-   * y sincronice su boca animada y el bocadillo visual superior.
+   * Unified helper for FocusBud to speak autonomously with real English voice synthesis
+   * while synchronizing its animated mouth and top speech bubble.
    */
   const speakFocusBud = (text: string, options?: { rate?: number; pitch?: number; force?: boolean }) => {
     if (!text || typeof window === 'undefined') return;
     const now = Date.now();
-    // Prevenir colisiones o spam si ya está hablando (a menos que sea forzado)
+    // Prevent collisions or spam if already speaking (unless forced)
     if (!options?.force && (isBudSpeakingAudioRef.current || (now - lastSpokenTimeRef.current < 3500))) {
       setBudMessage(text);
       return;
@@ -449,7 +458,7 @@ export default function App() {
   };
 
 
-  // Métricas acumuladas para el debriefing cognitivo post-sesión
+  // Accumulated metrics for post-session cognitive debrief
   const focusSamplesRef = useRef<number[]>([]);
   const flowSamplesCountRef = useRef<number>(0);
   const fatigueEventsCountRef = useRef<number>(0);
@@ -457,9 +466,9 @@ export default function App() {
   const [isDebriefLoading, setIsDebriefLoading] = useState<boolean>(false);
   const debriefRequestedRef = useRef<boolean>(false);
 
-  // Helper para extraer telemetría biométrica local anónima para el Mentor IA
+  // Helper to extract anonymous local biometric telemetry for the AI Mentor
   const getBiometricTelemetry = (): BiometricTelemetryPayload => ({
-    cognitiveState: aiPrediction?.className || 'NEUTRO',
+    cognitiveState: aiPrediction?.className || 'NEUTRAL',
     focusScore: Math.round(metricsRef.current.nivel_clap),
     stressLevel: Math.round(metricsRef.current.nivel_carga),
     sessionMinutes: Math.round(elapsedTimeRef.current / 60),
@@ -512,7 +521,7 @@ export default function App() {
         return;
       }
 
-      // Evitar subdividir un sub-paso ya existente (ej. "3.1") para no saturar la lista
+      // Avoid subdividing an already subdivided sub-step (e.g. "3.1")
       const isAlreadySubStep = /\b\d+\.\d+\b/.test(parentStepText);
       if (isAlreadySubStep) {
         metrics.is_subdividing = false;
@@ -522,7 +531,7 @@ export default function App() {
       setIsChatLoading(true);
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: `⚙️ Analizando dificultad del paso actual... Vamos a desglosar "${parentStepText}" en metas más pequeñas.`
+        content: `⚙️ Analyzing current step difficulty... Breaking "${parentStepText}" down into smaller milestones.`
       }]);
 
       try {
@@ -544,19 +553,19 @@ export default function App() {
 
           setChatMessages(prev => [...prev, {
             role: 'assistant',
-            content: `💡 ¡Listo! He subdividido el paso en 3 metas más sencillas:
+            content: `💡 Done! I split this step into 3 simpler milestones:
 ${data.subSteps.map((s: string) => `• ${s}`).join('\n')}
 
-Concentrémonos en el primer sub-paso. ¡Tú puedes!`
+Let's focus on the first sub-step. You've got this!`
           }]);
         } else {
-          throw new Error("Respuesta no válida");
+          throw new Error("Invalid response");
         }
       } catch (err) {
         console.error("Error subdividing step:", err);
         setChatMessages(prev => [...prev, {
           role: 'assistant',
-          content: `⚠️ No pude desglosar el paso automáticamente, pero recuerda que puedes tomar un breve respiro si lo necesitas.`
+          content: `⚠️ Couldn't break the step down automatically, take a quick breath if you need one.`
         }]);
       } finally {
         setIsChatLoading(false);
@@ -599,7 +608,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     };
   }, [isStarted, currentStepIdx, steps.length, isPaused]);
 
-  // Disparo del Debriefing Cognitivo Post-Sesión al completar todos los pasos
+  // Trigger Post-Session Cognitive Debrief upon completing all steps
   useEffect(() => {
     if (steps.length > 0 && currentStepIdx >= steps.length && !debriefRequestedRef.current) {
       debriefRequestedRef.current = true;
@@ -617,7 +626,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         : 65;
 
       sessionDebriefUniversal({
-        task: task || 'Sesión de Trabajo',
+        task: task || 'Work Session',
         totalMinutes: totalMins,
         completedStepsCount: steps.length,
         totalStepsCount: steps.length,
@@ -627,11 +636,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       }).then(res => {
         setSessionDebrief(res.debrief);
 
-        // Guardar sesión completada con debriefing en historial local
+        // Save completed session with debrief to local history
         const finalSessionId = currentSessionIdRef.current || `session-${Date.now()}`;
         saveSessionItem({
           id: finalSessionId,
-          task: task || 'Sesión de Trabajo',
+          task: task || 'Work Session',
           timestamp: Date.now(),
           durationMinutes: totalMins,
           completedSteps: steps.length,
@@ -641,18 +650,18 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           status: 'COMPLETADA'
         });
 
-        // FocusBud sintetiza el debriefing con voz empática en español (5 a 8 segundos)
-        const spokenDebrief = `¡Sesión completada con éxito! Has finalizado todos los pasos de ${task || 'tu meta'}. Tu enfoque promedio fue de ${avgFocus} por ciento. ¡Excelente constancia!`;
+        // FocusBud synthesizes the debrief with empathetic English voice (5 to 8 seconds)
+        const spokenDebrief = `Session completed successfully! You finished every step of ${task || 'your goal'}. Your average focus was ${avgFocus} percent. Outstanding consistency!`;
         speakFocusBud(spokenDebrief, { force: true, rate: 0.98 });
       }).catch(err => {
         console.warn("[Debrief Error]:", err);
-        const fallback = `SESIÓN CONCLUIDA: Has completado todos los pasos de "${task}". Tu enfoque promedio fue de ${avgFocus}%. Respira hondo y felicítate por este avance tangible.`;
+        const fallback = `SESSION COMPLETE: You finished all steps of "${task}". Your average focus was ${avgFocus}%. Take a deep breath and celebrate this tangible progress.`;
         setSessionDebrief(fallback);
 
         const finalSessionId = currentSessionIdRef.current || `session-${Date.now()}`;
         saveSessionItem({
           id: finalSessionId,
-          task: task || 'Sesión de Trabajo',
+          task: task || 'Work Session',
           timestamp: Date.now(),
           durationMinutes: totalMins,
           completedSteps: steps.length,
@@ -662,7 +671,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           status: 'COMPLETADA'
         });
 
-        const spokenFallback = `¡Sesión terminada! Buen trabajo con todos tus pasos. Descansa la mente y estira un poco.`;
+        const spokenFallback = `Session complete! Great job finishing all your steps. Rest your mind and stretch a bit.`;
         speakFocusBud(spokenFallback, { force: true, rate: 0.98 });
       }).finally(() => {
         setIsDebriefLoading(false);
@@ -671,7 +680,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     }
   }, [currentStepIdx, steps.length, elapsedTime, task]);
 
-  // Controles de Audio Ambiental (Ruido Marrón)
+  // Ambient Audio Controls (Brown Noise)
   const toggleBrownNoise = () => {
     if (isBrownNoiseActive) {
       brownNoise.stop();
@@ -696,7 +705,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
   };
 
   const handleTriggerTestGrounding = () => {
-    // Si ya está en descanso, regresa a trabajo; si está en trabajo, activa el descanso
+    // Toggle between break and work mode for testing grounding exercises
     if (timerMode === 'SHORT_BREAK' || timerMode === 'LONG_BREAK') {
       setTimerMode('WORK');
       setTimerSecondsLeft(workDuration || 25 * 60);
@@ -712,14 +721,13 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     }
   };
 
-  // Ciclo del Temporizador Pomodoro Adaptable
+  // Adaptive Pomodoro Timer Loop
   useEffect(() => {
     let timerInterval: any = null;
     if (isStarted && isTimerRunning && !isPaused) {
       timerInterval = setInterval(() => {
         setTimerSecondsLeft(prev => {
           if (prev <= 1) {
-            // Cambio de modo al llegar a 0
             if (timerMode === 'WORK') {
               setCompletedBlocks(c => c + 1);
               if (isBrownNoiseActive) {
@@ -744,22 +752,22 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     };
   }, [isStarted, isTimerRunning, isPaused, timerMode, workDuration, breakDuration, isBrownNoiseActive, noiseVolume]);
 
-  // Detener audio al desmontar
+  // Stop audio on unmount
   useEffect(() => {
     return () => {
       brownNoise.stop();
     };
   }, []);
 
-  // UX states for Micro-rewards (Paso 7/8: Celebración Kawaii Anime 60 FPS)
+  // UX states for Micro-rewards (Kawaii Anime 60 FPS Celebration)
   const [rewardKaomoji, setRewardKaomoji] = useState('');
   const [isShowingReward, setIsShowingReward] = useState(false);
   const [rewardArchetypeIdx, setRewardArchetypeIdx] = useState(0);
   const [isStateLocked] = useState(false);
   const mascotExpressionRef = useRef<'normal' | 'blink' | 'happy'>('normal');
-  const KAOMOJIS = ["(๑˃̵ᴗ˂̵)و 🚀", "✨ ESTELAR ✨", "🌸 FLUIDO 🌸", "⚡️ ENERGÍA ⚡️", "(ง'̀-'́)ง ⚡️"];
+  const KAOMOJIS = ["(๑˃̵ᴗ˂̵)و 🚀", "✨ STELLAR ✨", "🌸 FLOWING 🌸", "⚡️ ENERGY ⚡️", "(ง'̀-'́)ง ⚡️"];
 
-  // Notificaciones Contextuales de FocusBud (Body Doubling - Fase 4)
+  // FocusBud Contextual Notifications (Body Doubling)
   const stepDistractionsRef = useRef<number>(0);
   const prevAvatarStateRef = useRef<FocusState>('ENFOQUE');
 
@@ -771,7 +779,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     ? 'CELEBRACION'
     : mapAIPredictionToAvatarState(aiPrediction?.className);
 
-  // Estado biométrico directo emitido por la Red Neuronal (ej. 'AGOBIO POSTURAL', 'SOBREESTIMULACIÓN', 'ENFOQUE')
+  // Direct biometric state emitted by the Neural Network (e.g. 'POSTURAL STRAIN', 'OVERSTIMULATION', 'ENFOQUE')
   const rawAIState = (isBreakActive || isPaused)
     ? 'PAUSA'
     : isShowingReward
@@ -786,7 +794,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
   useEffect(() => {
     if (isBudStreamingRef.current) return;
     if (isBreakActive) {
-      setBudMessage("Buen trabajo. Terminamos este bloque. Toca descansar un poco.");
+      setBudMessage("Great job. Block complete. Time for a short rest.");
       return;
     }
 
@@ -802,7 +810,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     setBudMessage(msg);
   }, [rawAIState, currentFocusState, currentStepIdx, steps, currentActiveStep, isBreakActive]);
 
-  // Reiniciar contador de distracciones al cambiar o completar un paso
+  // Reset distraction counter when changing or completing a step
   useEffect(() => {
     stepDistractionsRef.current = 0;
   }, [currentStepIdx]);
@@ -827,19 +835,19 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       const data = await chatUniversal(
         msgsForAi,
         geminiApiKey,
-        steps[currentStepIdx] || 'Preparación general',
-        task || 'Estudio / Trabajo',
+        steps[currentStepIdx] || 'General preparation',
+        task || 'Study / Work',
         getBiometricTelemetry()
       );
 
-      const replyText = typeof data.reply === 'string' ? data.reply : "⚠️ Error de decodificación neuronal.";
+      const replyText = typeof data.reply === 'string' ? data.reply : "⚠️ Neural decoding error.";
 
       setChatMessages(prev => [...prev, { role: 'assistant', content: replyText }]);
       if (data.proposal) {
         setProposedChange(data.proposal);
       }
 
-      // FocusBud vocaliza en vivo la primera frase de la respuesta (3-5 segundos)
+      // FocusBud speaks the first sentence of the reply live (3-5 seconds)
       const firstSentence = replyText.split(/[.!?]\s+/)[0] || replyText;
       const cleanVoice = firstSentence.replace(/[*_#"`]/g, '').trim();
       if (cleanVoice.length > 4 && !cleanVoice.startsWith('⚠️')) {
@@ -848,7 +856,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       }
 
     } catch (e) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Enlace neuronal inestable.' }]);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Unstable neural link.' }]);
     } finally {
       setIsChatLoading(false);
     }
@@ -880,7 +888,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         const data = await chatUniversal(
           [...currentMsgs, sysMsg],
           geminiApiKey,
-          steps[currentStepIdx] || 'Trabajo en curso',
+          steps[currentStepIdx] || 'Work in progress',
           task || 'General',
           getBiometricTelemetry()
         );
@@ -899,7 +907,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
   const handleStart = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    const finalTask = task.trim() ? task : 'Estudiar material general';
+    const finalTask = task.trim() ? task : 'Study general material';
     setTask(finalTask);
     setIsSurveyLoading(true);
 
@@ -929,27 +937,27 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       const data = await splitTaskUniversal(
         task,
         answersToSend,
-        `Modo de trabajo: ${workMode}, Sensibilidad: ${sensitivity}`,
+        `Work mode: ${workMode}, Sensitivity: ${sensitivity}`,
         geminiApiKey
       );
 
       if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
-        resolvedSteps = data.steps.map((s: any) => String(typeof s === 'string' ? s : (s?.step || s?.text || s?.description || s?.action || s || '')).replace(/(Paso \d+:)/i, '').trim()).filter(Boolean);
+        resolvedSteps = data.steps.map((s: any) => String(typeof s === 'string' ? s : (s?.step || s?.text || s?.description || s?.action || s || '')).replace(/(Step \d+\.\d+:|Step \d+:|Paso \d+\.\d+:|Paso \d+:)/i, '').trim()).filter(Boolean);
       } else {
-        throw new Error("Formato de respuesta incorrecto");
+        throw new Error("Invalid response format");
       }
     } catch (err) {
-      console.error("Error al generar ruta de trabajo:", err);
+      console.error("Error generating work roadmap:", err);
       resolvedSteps = [
-        `DELIMITA el objetivo y alcance principal de '${task}'.`,
-        `ORGANIZA los materiales o fuentes indispensables para arrancar.`,
-        `DESARROLLA el primer bloque central con enfoque total.`,
-        `REVISA y consolida el avance realizado.`
+        `DEFINE the core objective and scope of '${task}'.`,
+        `ORGANIZE the essential materials or sources to get started.`,
+        `DEVELOP the first central block with full focus.`,
+        `REVIEW and consolidate the progress achieved.`
       ];
     } finally {
       setSteps(resolvedSteps);
 
-      // Sincronización con la Encuesta de Duración (surveyAnswers.q1)
+      // Synchronize with Duration Survey (surveyAnswers.q1)
       const q1Ans = surveyAnswers.q1 || '';
       let wDur = 25 * 60;
       let bDur = 5 * 60;
@@ -959,11 +967,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         wDur = 25 * 60;
         bDur = 5 * 60;
         targetBlocks = 1;
-      } else if (q1Ans.includes('60') || q1Ans.toLowerCase().includes('estándar') || q1Ans.toLowerCase().includes('estandar')) {
+      } else if (q1Ans.includes('60') || q1Ans.toLowerCase().includes('standard') || q1Ans.toLowerCase().includes('estándar') || q1Ans.toLowerCase().includes('estandar')) {
         wDur = 25 * 60;
         bDur = 5 * 60;
         targetBlocks = 2;
-      } else if (q1Ans.includes('90') || q1Ans.includes('120') || q1Ans.toLowerCase().includes('profunda')) {
+      } else if (q1Ans.includes('90') || q1Ans.includes('120') || q1Ans.toLowerCase().includes('deep') || q1Ans.toLowerCase().includes('profunda')) {
         wDur = 45 * 60;
         bDur = 10 * 60;
         targetBlocks = 3;
@@ -983,12 +991,12 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       setIsStarted(true);
       setAppStage('FOCUS');
 
-      // Iniciar y registrar la nueva sesión en el historial local
+      // Start and log the new session in local history
       const sId = `session-${Date.now()}`;
       currentSessionIdRef.current = sId;
       saveSessionItem({
         id: sId,
-        task: task || 'Sesión de Trabajo',
+        task: task || 'Work Session',
         timestamp: Date.now(),
         durationMinutes: 0,
         completedSteps: 0,
@@ -1009,12 +1017,12 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     setIsLoading(true);
     try {
       const currentMsgs = briefingMsgs.map(m => ({ role: m.role, content: m.content }));
-      const sysMsg = { role: 'system', content: `El usuario está en una entrevista de briefing para configurar sus tareas. Tarea actual: "${task}". Modo: ${workMode}. Hazle otra pregunta breve si necesitas más contexto para crear micro-pasos, o dale ánimos si ya tienes lo necesario.` };
+      const sysMsg = { role: 'system', content: `The user is in a briefing interview to set up their tasks. Current task: "${task}". Mode: ${workMode}. Ask another brief question in English if you need more context to create micro-steps, or encourage them if you have what you need.` };
 
       const data = await chatUniversal(
         [sysMsg, ...currentMsgs, { role: 'user', content: userMsg }],
         geminiApiKey,
-        'Briefing inicial',
+        'Initial briefing',
         task
       );
       if (data.reply) {
@@ -1029,7 +1037,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
   const handleStartFocus = async () => {
     setIsLoading(true);
-    const contextStr = briefingMsgs.map(m => `${m.role === 'user' ? 'Usuario' : 'IA'}: ${m.content}`).join('\n');
+    const contextStr = briefingMsgs.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
     let resolvedSteps: string[] = [];
 
     try {
@@ -1041,12 +1049,12 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       );
 
       if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
-        resolvedSteps = data.steps.map((s: any) => String(typeof s === 'string' ? s : (s?.step || s?.text || s?.description || s?.action || s || '')).replace(/(Paso \d+:)/i, '').trim()).filter(Boolean);
+        resolvedSteps = data.steps.map((s: any) => String(typeof s === 'string' ? s : (s?.step || s?.text || s?.description || s?.action || s || '')).replace(/(Step \d+\.\d+:|Step \d+:|Paso \d+\.\d+:|Paso \d+:)/i, '').trim()).filter(Boolean);
       } else {
-        throw new Error("Formato de respuesta incorrecto");
+        throw new Error("Invalid response format");
       }
     } catch (err) {
-      resolvedSteps = ['Preparar material', 'Iniciar primera fase', 'Revisar progreso', 'Finalizar'];
+      resolvedSteps = ['PREPARE materials', 'START first phase', 'REVIEW progress', 'WRAP UP'];
     } finally {
       setSteps(resolvedSteps);
       setIsTimerRunning(true);
@@ -1057,12 +1065,12 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       setIsStarted(true);
       setAppStage('FOCUS');
 
-      // Iniciar y registrar la nueva sesión en el historial local
+      // Start and log the new session in local history
       const sId = `session-${Date.now()}`;
       currentSessionIdRef.current = sId;
       saveSessionItem({
         id: sId,
-        task: task || 'Sesión de Trabajo',
+        task: task || 'Work Session',
         timestamp: Date.now(),
         durationMinutes: 0,
         completedSteps: 0,
@@ -1071,11 +1079,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         status: 'EN_PROGRESO'
       });
 
-      // Bienvenida con voz autónoma de FocusBud (3-4 segundos)
+      // Autonomous FocusBud voice welcome (3-4 seconds)
       setTimeout(() => {
         const welcomePhrases = [
-          `¡Todo listo! Iniciamos la sesión de ${task || 'estudio'}. Te acompaño en cada paso.`,
-          `¡Enfoque activado! Primer micro-paso en marcha. Vamos a nuestro propio ritmo.`
+          `All set! Starting your ${task || 'study'} session. I am right here with you every step of the way.`,
+          `Focus activated! First micro-step underway. Let's move at our own steady pace.`
         ];
         const phrase = welcomePhrases[Math.floor(Math.random() * welcomePhrases.length)];
         speakFocusBud(phrase, { force: true, rate: 0.98 });
@@ -1091,7 +1099,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     if (!isSystemBooted.current && videoRef.current && canvasRef.current) {
       isSystemBooted.current = true;
       const initSystem = async () => {
-        // Esperar a que MediaPipe esté inyectado en window
+        // Wait for MediaPipe to be injected on window
         let waitCount = 0;
         while (!window.Holistic && waitCount < 30 && isComponentMounted) {
           await new Promise(r => setTimeout(r, 150));
@@ -1101,7 +1109,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         if (!isComponentMounted) return;
 
         if (!window.Holistic) {
-          console.warn("⚠️ MediaPipe CDN no respondió a tiempo. Continuando en modo de resiliencia...");
+          console.warn("⚠️ MediaPipe CDN did not respond in time. Continuing in resilience mode...");
           setWarmupSteps(prev => prev.map(s => s.id === 'mediapipe' ? { ...s, status: 'completed', detail: 'CDN OFFLINE' } : s));
           setWarmupProgress(prev => Math.max(prev, 80));
           setTimeout(() => {
@@ -1112,7 +1120,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         }
 
         try {
-          // 1. Inicializar Holistic en Modo Ligero (Complexity 0)
+          // 1. Initialize Holistic in Lightweight Mode (Complexity 0)
           const holistic = new window.Holistic({
             locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`,
           });
@@ -1131,12 +1139,12 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           holisticRef.current = holistic;
 
           if (isComponentMounted) {
-            setWarmupSteps(prev => prev.map(s => s.id === 'mediapipe' ? { ...s, status: 'completed', detail: 'WASM ACTIVO' } : (s.id === 'camera' ? { ...s, status: 'loading', detail: 'ACCEDIENDO' } : s)));
+            setWarmupSteps(prev => prev.map(s => s.id === 'mediapipe' ? { ...s, status: 'completed', detail: 'WASM ACTIVE' } : (s.id === 'camera' ? { ...s, status: 'loading', detail: 'ACCESSING' } : s)));
             setWarmupProgress(prev => Math.max(prev, 70));
           }
 
-          // 2. Solicitar cámara nativa en 320x240 (1/4 de consumo de RAM y ancho de banda USB/WASM)
-          if (statusRef.current) statusRef.current.textContent = "SOLICITANDO CAMARA...";
+          // 2. Request native camera at 320x240 (1/4 RAM and USB/WASM bandwidth footprint)
+          if (statusRef.current) statusRef.current.textContent = "REQUESTING CAMERA...";
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               width: { ideal: 320, max: 480 },
@@ -1157,18 +1165,18 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               videoRef.current?.play().catch(e => console.warn("Video play notice:", e));
             };
 
-            // 3. Procesamiento controlado de cuadros
+            // 3. Throttled frame processing
             videoRef.current.onplaying = () => {
               if (isComponentMounted) {
-                setWarmupSteps(prev => prev.map(s => s.id === 'camera' ? { ...s, status: 'completed', detail: 'STREAM ACTIVO' } : s));
+                setWarmupSteps(prev => prev.map(s => s.id === 'camera' ? { ...s, status: 'completed', detail: 'STREAM ACTIVE' } : s));
                 setWarmupProgress(prev => Math.max(prev, 90));
               }
 
-              // Fallback de seguridad: si no detecta landmarks en 3.5s, desbloquear suavemente
+              // Safety fallback: if no landmarks detected within 3.5s, unlock smoothly
               setTimeout(() => {
                 if (!hasFirstLandmarkRef.current && isComponentMounted) {
                   hasFirstLandmarkRef.current = true;
-                  setWarmupSteps(prev => prev.map(s => ({ ...s, status: 'completed', detail: s.detail || 'STREAM ACTIVO' })));
+                  setWarmupSteps(prev => prev.map(s => ({ ...s, status: 'completed', detail: s.detail || 'STREAM ACTIVE' })));
                   setWarmupProgress(100);
                   setTimeout(() => {
                     setIsPreWarmupVisible(false);
@@ -1177,7 +1185,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                 }
               }, 3500);
 
-              if (statusRef.current) statusRef.current.textContent = "ANALIZANDO BIOMETRIA...";
+              if (statusRef.current) statusRef.current.textContent = "ANALYZING BIOMETRICS...";
 
               let isProcessing = false;
 
@@ -1216,9 +1224,9 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             };
           }
         } catch (error) {
-          console.warn("[Hardware Warmup] Acceso a cámara opcional o bloqueado:", error);
+          console.warn("[Hardware Warmup] Camera access optional or blocked:", error);
           if (isComponentMounted) {
-            setWarmupSteps(prev => prev.map(s => s.id === 'camera' ? { ...s, status: 'completed', detail: 'MODO SIN CAMARA' } : s));
+            setWarmupSteps(prev => prev.map(s => s.id === 'camera' ? { ...s, status: 'completed', detail: 'CAMERA-FREE MODE' } : s));
             setWarmupProgress(100);
             setTimeout(() => {
               setIsPreWarmupVisible(false);
@@ -1226,7 +1234,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             }, 600);
           }
           if (statusRef.current) {
-            statusRef.current.textContent = "MODO LOCAL SIN CAMARA";
+            statusRef.current.textContent = "LOCAL CAMERA-FREE MODE";
             statusRef.current.className = "px-4 py-2 mt-4 rounded-md border font-mono text-xs tracking-wider absolute top-4 left-4 bg-zinc-800/80 text-zinc-400 border-zinc-700/50 uppercase shadow-2xl backdrop-blur-md";
           }
         }
@@ -1253,10 +1261,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     };
   }, []);
   const onResults = (results: any) => {
-    // Sincronización del primer frame detectado con PreWarmupScreen
+    // Synchronize first detected frame with PreWarmupScreen
     if (results.faceLandmarks && !hasFirstLandmarkRef.current) {
       hasFirstLandmarkRef.current = true;
-      setWarmupSteps(prev => prev.map(s => ({ ...s, status: 'completed', detail: '60 FPS ESTABLE' })));
+      setWarmupSteps(prev => prev.map(s => ({ ...s, status: 'completed', detail: '60 FPS STABLE' })));
       setWarmupProgress(100);
       setTimeout(() => {
         setIsPreWarmupVisible(false);
@@ -1264,7 +1272,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       }, 400);
     }
 
-    // Optimización 60 FPS: Solo renderizar en canvas si está visible (evita decodificación masiva de 1280x720 en background)
+    // 60 FPS Optimization: Only render onto canvas when visible
     const canvas = canvasRef.current;
     if (canvas && !canvas.classList.contains('hidden') && canvas.offsetParent !== null) {
       const canvasCtx = canvas.getContext('2d');
@@ -1275,7 +1283,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         canvasCtx.save();
         canvasCtx.clearRect(0, 0, width, height);
 
-        // Flip horizonally to mirror
+        // Flip horizontally to mirror
         canvasCtx.translate(width, 0);
         canvasCtx.scale(-1, 1);
 
@@ -1302,16 +1310,16 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
     if (isPausedRef.current) {
       if (statusRef.current) {
-        statusRef.current.textContent = "SISTEMA PAUSADO (PULSA 'Q')";
+        statusRef.current.textContent = "SYSTEM PAUSED (PRESS 'Q')";
         statusRef.current.className = `px-4 py-2 mt-4 rounded-md border font-mono text-xs tracking-wider absolute top-4 left-4 bg-blue-500/10 text-blue-400 border-blue-500/30 uppercase shadow-2xl backdrop-blur-md`;
       }
       return;
     }
 
     // ===========================================
-    // NÚCLEO BIOMÉTRICO P.D.E.F. v1.0
+    // P.D.E.F. v1.0 BIOMETRIC CORE
     // ===========================================
-    let statusMsg = "EN ESTADO DE FLUJO (FIJACIÓN ACTIVA)";
+    let statusMsg = "IN FLOW STATE (ACTIVE FIXATION)";
     let statusColor = "text-green-500";
     let statusBg = "bg-green-500/10";
     let statusBorder = "border-green-500/30";
@@ -1321,7 +1329,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       const now = Date.now();
       const metrics = metricsRef.current;
 
-      // Fase de Calibración (15 segundos)
+      // Calibration Phase (15 seconds)
       if (!metrics.calibration_start) {
         metrics.calibration_start = now;
         metrics.calib_frames = 0;
@@ -1333,9 +1341,9 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       }
       const isCalibrating = (now - metrics.calibration_start) < 15000;
 
-      // --- EXTRACCIÓN DE MALLA (PDEF) ---
-      const pI = faces[468] || faces[159]; // Pupila/Ojo Izquierdo
-      const pD = faces[473] || faces[386]; // Pupila/Ojo Derecho
+      // --- MESH EXTRACTION (PDEF) ---
+      const pI = faces[468] || faces[159]; // Left Pupil/Eye
+      const pD = faces[473] || faces[386]; // Right Pupil/Eye
       const upperEye = faces[159];
       const lowerEye = faces[145];
       const outerEye = faces[33];
@@ -1360,7 +1368,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       const midX = (pI.x + pD.x) / 2;
       const midY = (pI.y + pD.y) / 2;
       metrics.gaze_history.push({ x: midX, y: midY, t: now });
-      metrics.gaze_history = metrics.gaze_history.filter(p => now - p.t < 10000); // Ventana de 10s
+      metrics.gaze_history = metrics.gaze_history.filter(p => now - p.t < 10000); // 10s window
 
       let variance = 0;
       if (metrics.gaze_history.length > 5) {
@@ -1374,7 +1382,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         variance /= metrics.gaze_history.length;
       }
 
-      // --- EXTRACCIÓN CINEMÁTICA (Pose de Agobio / Tensión) ---
+      // --- KINEMATIC EXTRACTION (Postural Strain / Tension) ---
       const pose = results.poseLandmarks;
       let distressPosture = false;
       let postureDetail = "";
@@ -1405,58 +1413,58 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         const leftHip = pose[23] || { x: leftShoulder.x, y: leftShoulder.y + 0.5 };
         const rightHip = pose[24] || { x: rightShoulder.x, y: rightShoulder.y + 0.5 };
 
-        // 1. Ángulo en el codo (brazo estirado)
+        // 1. Elbow angle (extended arm)
         const leftElbowAngle = getAngle(leftShoulder, leftElbow, leftWrist);
         const rightElbowAngle = getAngle(rightShoulder, rightElbow, rightWrist);
 
-        // 2. Ángulo en el hombro con respecto al torso (línea recta / 180 grados con el cuerpo hacia arriba)
+        // 2. Shoulder-to-torso angle
         leftShoulderTorsoAngle = getAngle(leftElbow, leftShoulder, leftHip);
         rightShoulderTorsoAngle = getAngle(rightElbow, rightShoulder, rightHip);
         const isLeftArmRaisedUp = leftShoulderTorsoAngle > 135;
         const isRightArmRaisedUp = rightShoulderTorsoAngle > 135;
 
-        // 3. Ángulo del brazo con respecto al hombro opuesto (brazo horizontal o extendido hacia fuera)
+        // 3. Arm-to-opposite-shoulder angle
         leftArmShoulderAngle = getAngle(leftElbow, leftShoulder, rightShoulder);
         rightArmShoulderAngle = getAngle(rightElbow, rightShoulder, leftShoulder);
         const isLeftArmHorizontal = Math.abs(leftArmShoulderAngle - 180) < 35;
         const isRightArmHorizontal = Math.abs(rightArmShoulderAngle - 180) < 35;
 
-        // 4. Manos (muñecas) por encima del torso o de los hombros
+        // 4. Hands (wrists) above torso/shoulders
         const isLeftHandAboveTorso = leftWrist.y < leftShoulder.y - 0.05;
         const isRightHandAboveTorso = rightWrist.y < rightShoulder.y - 0.05;
 
-        // Condición combinada de agobio/tensión
+        // Combined strain/tension condition
         if (isLeftArmRaisedUp || isRightArmRaisedUp) {
           distressPosture = true;
-          postureDetail = `Brazos arriba (Izq: ${leftShoulderTorsoAngle.toFixed(0)}°, Der: ${rightShoulderTorsoAngle.toFixed(0)}°)`;
+          postureDetail = `Arms raised (L: ${leftShoulderTorsoAngle.toFixed(0)}°, R: ${rightShoulderTorsoAngle.toFixed(0)}°)`;
         } else if (isLeftArmHorizontal || isRightArmHorizontal) {
           distressPosture = true;
-          postureDetail = `Brazos rectos (Izq: ${leftArmShoulderAngle.toFixed(0)}°, Der: ${rightArmShoulderAngle.toFixed(0)}°)`;
+          postureDetail = `Arms straight (L: ${leftArmShoulderAngle.toFixed(0)}°, R: ${rightArmShoulderAngle.toFixed(0)}°)`;
         } else if (isLeftHandAboveTorso || isRightHandAboveTorso) {
           distressPosture = true;
-          postureDetail = "Manos altas";
+          postureDetail = "Hands raised";
         }
       }
 
-      // Calcular delta de tiempo real entre frames
+      // Compute real-time frame delta
       const delta = Math.min(1000, metrics.last_frame_time > 0 ? (now - metrics.last_frame_time) : 33);
       metrics.last_frame_time = now;
 
-      // 1. Cálculo de Desplazamiento Nasal (Inquietud física)
+      // 1. Nasal displacement calculation (physical restlessness)
       let noseDelta = 0;
       if (lastNoseRef.current) {
         noseDelta = Math.hypot(nose.x - lastNoseRef.current.x, nose.y - lastNoseRef.current.y);
       }
       lastNoseRef.current = { x: nose.x, y: nose.y };
 
-      // 2. Ángulo de hombros / Postura
+      // 2. Shoulder / Posture angle
       let shoulderAngle = 105;
       if (pose && pose[11] && pose[12] && pose[13]) {
         const rad = Math.atan2(pose[13].y - pose[11].y, pose[13].x - pose[11].x) - Math.atan2(pose[12].y - pose[11].y, pose[12].x - pose[11].x);
         shoulderAngle = Math.abs((rad * 180) / Math.PI);
       }
 
-      // MAR (Mouth Aspect Ratio - Detección de bostezo / fatiga somnolienta)
+      // MAR (Mouth Aspect Ratio - Yawn / drowsy fatigue detection)
       const mouthTop = faces[13];
       const mouthBottom = faces[14];
       const mouthLeft = faces[61] || faces[78];
@@ -1465,11 +1473,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       const mouthWidth = Math.hypot(mouthLeft.x - mouthRight.x, mouthLeft.y - mouthRight.y);
       const MAR = mouthWidth > 0 ? mouthHeight / mouthWidth : 0.05;
 
-      // Inclinación lateral de la cabeza (Roll angle en grados)
+      // Lateral head tilt (Roll angle in degrees)
       const rollRad = Math.atan2(faces[263].y - faces[33].y, faces[263].x - faces[33].x);
       const rollAngle = rollRad * (180 / Math.PI);
 
-      // 3. Buffer rodante de 2 segundos para la Red Neuronal de TensorFlow.js (12 Dimensiones)
+      // 3. Rolling 2-second buffer for TensorFlow.js Neural Network (12 Dimensions)
       windowFramesRef.current.push({
         ear: EAR,
         yaw: yawRatio,
@@ -1504,7 +1512,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       const pitchStd = Math.sqrt(pitches.reduce((sq, n) => sq + Math.pow(n - pitchMean, 2), 0) / wCount);
       const frownMean = frowns.reduce((a, b) => a + b, 0) / wCount;
 
-      // Normalización temporal de desplazamiento nasal (independiente de los FPS del navegador)
+      // Temporal normalization of nasal displacement (independent of browser FPS)
       const wDurationSec = Math.max(0.5, (wFrames[wFrames.length - 1].t - wFrames[0].t) / 1000);
       const rawNoseSum = wFrames.reduce((a, b) => a + b.noseDelta, 0);
       const noseDeltaSum = (rawNoseSum / wDurationSec) * 2.0;
@@ -1514,7 +1522,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       const marMean = mars.reduce((a, b) => a + b, 0) / wCount;
       const rollMean = rolls.reduce((a, b) => a + b, 0) / wCount;
 
-      // 4. INFERENCIA CON LA RED NEURONAL ENTRENADA EN TENSORFLOW.JS (<2ms)
+      // 4. TRAINED TENSORFLOW.JS NEURAL NETWORK INFERENCE (<2ms)
       const aiResult = evaluateAIBiometrics({
         ear_mean: earMean,
         ear_min: earMin,
@@ -1530,7 +1538,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         roll_angle_mean: rollMean
       });
 
-      // Histéresis temporal de 1200ms para estabilización clínica de clase en pantalla
+      // 1200ms temporal hysteresis for clinical on-screen class stabilization
       const rawClassIdx = aiResult.classIndex;
       if (rawClassIdx !== displayedClassRef.current) {
         if (pendingClassRef.current !== rawClassIdx) {
@@ -1545,12 +1553,12 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       }
 
       const CLASS_NAMES = [
-        'ESTUDIO NORMAL / NEUTRO',
-        'ENFOQUE PROFUNDO (FLOW)',
-        'DISTRACCIÓN',
-        'FATIGA',
-        'SOBREESTIMULACIÓN',
-        'AGOBIO POSTURAL'
+        'NORMAL STUDY / NEUTRAL',
+        'DEEP FOCUS (FLOW)',
+        'DISTRACTION',
+        'FATIGUE',
+        'OVERSTIMULATION',
+        'POSTURAL STRAIN'
       ];
 
       const stabilizedResult: AIPredictionResult = {
@@ -1559,11 +1567,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         className: CLASS_NAMES[displayedClassRef.current] || aiResult.className
       };
 
-      // Guardado inteligente: Solo actualizar React state cuando cambie la clase cognitiva o la confianza varíe >= 4%
+      // Smart state update: Only update React state when cognitive class changes or confidence shifts >= 4%
       if (now - lastAiUpdateRef.current >= 250) {
         lastAiUpdateRef.current = now;
 
-        // Registro de métricas anónimas en sesión activa para el debriefing cognitivo (buffer circular acotado a 300 muestras para cuidar la RAM)
+        // Log anonymous metrics in active session for cognitive debrief (bounded 300-sample circular buffer)
         if (isStarted && currentStepIdx < steps.length && !isPaused) {
           if (focusSamplesRef.current.length >= 300) {
             focusSamplesRef.current.shift();
@@ -1586,14 +1594,14 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         });
       }
 
-      // Control Directo de Métricas C.L.A.P. y Carga Cognitiva con Suavizado Exponencial Orgánico
+      // Direct C.L.A.P. & Cognitive Load control with organic exponential smoothing
       const targetFocus = aiResult.focusScore;
       const targetLoad = aiResult.stressLevel;
 
       metrics.nivel_clap = Math.max(5, Math.min(100, metrics.nivel_clap * 0.94 + targetFocus * 0.06));
       metrics.nivel_carga = Math.max(0, Math.min(100, metrics.nivel_carga * 0.94 + targetLoad * 0.06));
 
-      // Paso 3: Enrutamiento de Telemetría Biocognitiva en Vivo a FocusBud (60 FPS, Latencia Cero)
+      // Live Bio-Cognitive Telemetry routing to FocusBud (60 FPS, Zero Latency)
       const pupilShiftX = (pI && outerEye && innerEye)
         ? ((pI.x - (outerEye.x + innerEye.x) / 2) / (Math.abs(outerEye.x - innerEye.x) || 1)) * 4.0
         : 0;
@@ -1631,30 +1639,30 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
 
 
-      // Subdivisión autónoma de tarea si la Red Neuronal detecta que el enfoque cayó bajo 40%
+      // Autonomous task subdivision if Neural Network detects focus dropped below 40%
       if (metrics.nivel_clap < 40 && !metrics.is_subdividing && !metrics.subdivided_indexes.includes(currentStepIdxRef.current)) {
         subdivideCurrentStepRef.current(currentStepIdxRef.current);
       }
 
-      // Higienización Postural Local Determinista (100% Edge Privacy, sin envíos de imagen ni video)
+      // Deterministic Local Postural Hygiene (100% Edge Privacy, zero image/video uploads)
       const pFatiga = aiResult.probabilities[3] || 0;
       const pAgobio = aiResult.probabilities[5] || 0;
 
       if (now - lastPostureUpdateRef.current >= 600) {
         lastPostureUpdateRef.current = now;
         let pStatus: 'OPTIMAL' | 'NECK_TILT' | 'SHOULDER_TENSION' = 'OPTIMAL';
-        let pLabel = 'Postura Óptima';
+        let pLabel = 'Optimal Posture';
         let pColor = 'text-emerald-400';
         let pBg = 'bg-emerald-950/40 border-emerald-800/40';
 
         if (pitchMean > 0.62) {
           pStatus = 'NECK_TILT';
-          pLabel = 'Ajuste Cervical';
+          pLabel = 'Neck Alignment';
           pColor = 'text-amber-400';
           pBg = 'bg-amber-950/40 border-amber-800/40';
         } else if (pAgobio > 0.55 || Math.abs(rollMean) > 22) {
           pStatus = 'SHOULDER_TENSION';
-          pLabel = 'Tensión Postural';
+          pLabel = 'Postural Tension';
           pColor = 'text-rose-400';
           pBg = 'bg-rose-950/40 border-rose-800/40';
         }
@@ -1665,7 +1673,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         });
       }
 
-      // Intervención proactiva en Streaming con Meta Muse Spark hacia FocusBud cuando la Red Neuronal detecta sobrecarga continua
+      // Proactive Streaming Intervention with Meta Muse Spark to FocusBud when Neural Network detects sustained overload
       if ((pAgobio > 0.65 || pFatiga > 0.65 || metrics.nivel_carga > 75) && (now - metrics.last_auto_chat > 45000)) {
         metrics.last_auto_chat = now;
         fatigueEventsCountRef.current += 1;
@@ -1673,7 +1681,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         isBudStreamingRef.current = true;
         let streamAccumulator = "";
 
-        // Calcular severidad de la señal biométrica para adaptar la duración y cadencia de la voz (3 a 8 segundos)
+        // Compute biometric signal severity to adapt voice duration and cadence (3 to 8 seconds)
         const severity = Math.max(
           Math.round(pFatiga * 100),
           Math.round(pAgobio * 100),
@@ -1686,7 +1694,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             perclos: Math.round(aiResult.perclos),
             fatigueScore: Math.round(pFatiga * 100),
             postureScore: Math.round(metrics.nivel_carga),
-            currentTask: steps[currentStepIdx] || task || 'Trabajo en curso',
+            currentTask: steps[currentStepIdx] || task || 'Work in progress',
             sessionMinutes: Math.round(elapsedTimeRef.current / 60),
             cognitiveClass: stabilizedResult.className
           },
@@ -1695,56 +1703,56 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           },
           () => {
             let fullText = streamAccumulator.trim();
-            // Sanitización estricta: purgar razonamiento interno en inglés si existiera
+            // Strict sanitization: purge internal reasoning tags or leaks if present
             fullText = fullText.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#"`]/g, '').trim();
-            if (/Starts with|Need to consider|We should|Count:|PERCLOS|User prompt/i.test(fullText)) {
+            if (/Starts with an? uppercase|Need to consider:|Count:\s*\d|User prompt:/i.test(fullText)) {
               fullText = "";
             }
 
-            // Micro-resumen verbal empático adaptado a la magnitud de la señal (3 a 8 segundos de voz)
+            // Empathetic verbal micro-summary tailored to signal magnitude (3 to 8 seconds of voice)
             let voiceSummary = "";
             let speechRate = 0.95;
 
             if (severity >= 70 || pFatiga > 0.65) {
-              // Señal grande de fatiga: voz pausada (~6-8s)
-              voiceSummary = "Detecto sobrecarga en tu ritmo. Cierra los ojos y respira hondo cinco segundos.";
+              // High fatigue signal: unhurried voice (~6-8s)
+              voiceSummary = "Detecting overload in your pace. Close your eyes and take a deep five-second breath.";
               speechRate = 0.88;
             } else if (pAgobio > 0.65) {
-              // Agobio: voz calmante (~5-6s)
-              voiceSummary = "Cero agobio. Respira hondo y da un solo clic a la vez.";
+              // Strain: calming voice (~5-6s)
+              voiceSummary = "Zero pressure. Take a deep breath and make just one click at a time.";
               speechRate = 0.90;
             } else if (metrics.nivel_carga > 45) {
-              // Tensión postural: voz ágil (~3-4s)
-              voiceSummary = "Ajusta tu postura: eleva el mentón y relaja los hombros.";
+              // Postural tension: crisp voice (~3-4s)
+              voiceSummary = "Check your posture: lift your chin and relax your shoulders.";
               speechRate = 1.0;
             } else {
-              voiceSummary = fullText || "Mantenemos el ritmo. Un paso a la vez.";
+              voiceSummary = fullText || "Keeping a steady pace. One step at a time.";
               speechRate = 0.95;
             }
 
-            // Si el texto de la IA es una frase limpia de menos de 12 palabras, usarla
+            // If AI text is a clean sentence under 12 words, use it directly
             const wordsCount = fullText.split(/\s+/).filter(Boolean).length;
-            if (fullText && wordsCount <= 12 && !/Starts with|Need to consider/i.test(fullText)) {
+            if (fullText && wordsCount <= 12 && !/Starts with an? uppercase|Need to consider:/i.test(fullText)) {
               voiceSummary = fullText;
             }
 
-            // 1. Mostrar micro-resumen en el bocadillo de FocusBud (resumido, no empuja el avatar)
+            // 1. Show micro-summary in FocusBud speech bubble
             setBudMessage(voiceSummary);
 
-            // 2. Colocar el consejo completo en el Chat de Asistencia
+            // 2. Post full advice in Support Chat
             setChatMessages(prev => [...prev, {
               role: 'assistant',
               content: `🤖 [FocusBud / Muse Spark]: ${fullText || voiceSummary}`
             }]);
 
-            // 3. Sintetizar la voz en vivo con Web Speech API (3 a 8 segundos)
+            // 3. Synthesize live voice via Web Speech API (3 to 8 seconds)
             audioService.speak(voiceSummary, {
               rate: speechRate,
               pitch: 1.08,
               onStart: () => setIsBudSpeaking(true),
               onEnd: () => {
                 setIsBudSpeaking(false);
-                // Desvanecer el bocadillo tras 2.5s de concluir la voz para mantener limpia la interfaz
+                // Fade out bubble 2.5s after voice finishes to keep UI clean
                 setTimeout(() => {
                   setBudMessage("");
                 }, 2500);
@@ -1758,29 +1766,24 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         );
       }
 
-      statusMsg = `🧠 IA: ${stabilizedResult.className} (${(stabilizedResult.confidence * 100).toFixed(0)}%) • ${stabilizedResult.statusMessage}`;
+      statusMsg = `🧠 AI: ${stabilizedResult.className} (${(stabilizedResult.confidence * 100).toFixed(0)}%) • ${stabilizedResult.statusMessage}`;
       statusColor = stabilizedResult.badgeColor;
       statusBg = stabilizedResult.badgeBg;
       statusBorder = stabilizedResult.badgeBorder;
     } else {
-      statusMsg = "ROSTRO FUERA DE ENCUADRE";
+      statusMsg = "FACE OUT OF FRAME";
       statusColor = "text-zinc-600";
       statusBg = "bg-zinc-800/10";
       statusBorder = "border-zinc-800/30";
     }
 
-    // Actualización directa del DOM de las barras para rendimiento a 60 FPS
+    // Direct DOM bar updates for 60 FPS performance
     if (focusRef.current) {
       focusRef.current.style.width = `${Math.round(metricsRef.current.nivel_clap)}%`;
     }
     if (fatigueRef.current) {
       fatigueRef.current.style.width = `${Math.round(metricsRef.current.nivel_carga)}%`;
     }
-    // Actualización de statusRef desactivada para consolidar notificación única en FocusBudWidget / AvatarMessage
-    // if (statusRef.current) {
-    //   statusRef.current.textContent = statusMsg;
-    //   statusRef.current.className = `px-4 py-2 mt-4 rounded-md border font-mono text-xs tracking-wider absolute top-4 left-4 ${statusBg} ${statusColor} ${statusBorder} uppercase shadow-2xl backdrop-blur-md transition-all duration-300`;
-    // }
   };
 
   const handleRecalibrate = (silent = false) => {
@@ -1799,9 +1802,9 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
     if (!silent) {
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: '🔄 Re-iniciando sensores biométricos. Por favor, mantén una postura cómoda y rostro neutral durante 15 segundos para la recalibración.'
+        content: '🔄 Restarting biometric sensors. Please maintain a comfortable posture and neutral expression for 15 seconds to recalibrate.'
       }]);
-      speakFocusBud("Recalibrando sensores. Mantén rostro neutral y postura cómoda durante quince segundos.", { force: true, rate: 0.98 });
+      speakFocusBud("Recalibrating sensors. Keep a neutral expression and comfortable posture for fifteen seconds.", { force: true, rate: 0.98 });
     }
 
   };
@@ -1809,7 +1812,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
   const handleAcceptProposal = () => {
     if (!proposedChange) return;
 
-    const newSteps = proposedChange.proposedSteps.map((s: string) => s.replace(/(Paso \d+\.\d+:|Paso \d+:)/i, '').trim());
+    const newSteps = proposedChange.proposedSteps.map((s: string) => s.replace(/(Step \d+\.\d+:|Step \d+:|Paso \d+\.\d+:|Paso \d+:)/i, '').trim());
     setTask(proposedChange.proposedTask);
     setSteps(newSteps);
     setCurrentStepIdx(0);
@@ -1821,7 +1824,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
     setChatMessages(prev => [...prev, {
       role: 'assistant',
-      content: `🚀 ¡Misión actualizada con éxito! Ahora tu objetivo es: "${proposedChange.proposedTask}".`
+      content: `🚀 Mission updated successfully! Your new goal is: "${proposedChange.proposedTask}".`
     }]);
 
     setTimeout(() => {
@@ -1843,9 +1846,9 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         clearTimeout(rewardTimeoutRef.current);
       }
 
-      // Trigger Kawaii Anime Reward Celebration (Rotación variada de 10 arquetipos)
+      // Trigger Kawaii Anime Reward Celebration (Varied rotation across 10 archetypes)
       const nextArchetype = nextIdx >= steps.length 
-        ? 5 // APEX VICTORY (¡DOMINIO TOTAL! 👑 ＼(＾▽＾)／ 👑) en el paso final
+        ? 5 // APEX VICTORY (TOTAL MASTERY! 👑 ＼(＾▽＾)／ 👑) on final step
         : Math.floor(Math.random() * REWARD_ARCHETYPES.length);
       setRewardArchetypeIdx(nextArchetype);
       const selectedKao = REWARD_ARCHETYPES[nextArchetype].kaomoji;
@@ -1857,10 +1860,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         rewardTimeoutRef.current = null;
       }, 1150);
 
-      // Diferir persistencia en localStorage por 250ms para que el frame 0 de la animación sea instantáneo (60 FPS puros)
+      // Defer localStorage persistence by 250ms so frame 0 of the animation is instant (pure 60 FPS)
       if (currentSessionIdRef.current) {
         const sessionId = currentSessionIdRef.current;
-        const currentTaskTitle = task || 'Sesión de Trabajo';
+        const currentTaskTitle = task || 'Work Session';
         const totalStepsCount = steps.length;
         window.setTimeout(() => {
           const focusHistory = focusSamplesRef.current;
@@ -1882,18 +1885,18 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       }
 
       if (nextIdx < steps.length) {
-        // Vocalización de FocusBud al completar el paso conectada en vivo con Baseten /api/step-celebration
+        // FocusBud vocalization upon completing the step connected live to Baseten /api/step-celebration
         const nextStepText = steps[nextIdx] || '';
-        const isNextSomatic = /^PAUSA(\s+SOMÁTICA)?/i.test(nextStepText);
+        const isNextSomatic = /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(nextStepText);
         if (isNextSomatic) {
-          speakFocusBud("Paso completado. Ahora entramos en una pausa somática. Inhala profundo y relaja los hombros.", { force: true });
+          speakFocusBud("Step completed. Entering a somatic pause now. Inhale deeply and relax your shoulders.", { force: true });
         } else {
           celebrateStepUniversal(completedStepText, nextStepText, task)
             .then(aiPhrase => {
               speakFocusBud(aiPhrase, { force: true, rate: 1.03 });
             })
             .catch(() => {
-              speakFocusBud("¡Paso dominado con éxito! Mantén el foco en el siguiente.", { force: true, rate: 1.02 });
+              speakFocusBud("Step mastered! Keep your focus steady on the next one.", { force: true, rate: 1.02 });
             });
         }
       }
@@ -1912,7 +1915,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       <>
         {/* GLOBAL HEADER CONTROLS (Settings, Audio & Status) */}
         <div className="fixed top-4 right-4 z-[90] flex items-center gap-3 bg-zinc-900/80 backdrop-blur-md border border-zinc-800 p-2.5 rounded-2xl shadow-2xl select-none">
-          {/* Conmutador de Audio Ambiental (Ruido Marrón) */}
+          {/* Ambient Audio Toggle (Brown Noise) */}
           <div className="flex items-center gap-2 pr-2 border-r border-zinc-800">
             <button
               onClick={toggleBrownNoise}
@@ -1921,10 +1924,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
                   : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-400 border border-zinc-700/50'
               }`}
-              title={isBrownNoiseActive ? "Desactivar Ruido Marrón" : "Activar Ruido Marrón"}
+              title={isBrownNoiseActive ? "Disable Brown Noise" : "Enable Brown Noise"}
             >
               <Headphones className={`w-3.5 h-3.5 ${isBrownNoiseActive ? 'text-amber-400 animate-pulse' : 'text-zinc-400'}`} />
-              <span className="hidden sm:inline font-semibold">Ruido Marrón:</span>
+              <span className="hidden sm:inline font-semibold">Brown Noise:</span>
               <span className={`font-bold ${isBrownNoiseActive ? 'text-amber-400' : 'text-zinc-500'}`}>
                 {isBrownNoiseActive ? 'ON' : 'OFF'}
               </span>
@@ -1940,7 +1943,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   value={noiseVolume}
                   onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
                   className="w-16 h-1.5 bg-zinc-800 accent-amber-400 rounded-lg cursor-pointer"
-                  title={`Volumen: ${Math.round(noiseVolume * 100)}%`}
+                  title={`Volume: ${Math.round(noiseVolume * 100)}%`}
                 />
               </div>
             )}
@@ -1949,7 +1952,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/80 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
             <span className="font-mono text-[9px] tracking-wider text-emerald-400 uppercase font-semibold">
-              Meta Muse Activo
+              Meta Muse Active
             </span>
           </div>
         </div>
@@ -1973,10 +1976,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               </div>
               <div>
                 <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
-                  Personalicemos tu sesión
+                  Let's personalize your session
                 </h2>
                 <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-                  Meta: <span className="text-emerald-400 font-medium font-mono">"{task}"</span>
+                  Goal: <span className="text-emerald-400 font-medium font-mono">"{task}"</span>
                 </p>
               </div>
             </div>
@@ -1984,9 +1987,9 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               type="button"
               onClick={() => setShowSurvey(false)}
               className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-zinc-800/50 cursor-pointer"
-              title="Volver a editar meta"
+              title="Edit goal"
             >
-              ← Modificar meta
+              ← Edit goal
             </button>
           </div>
 
@@ -2010,7 +2013,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
                   {/* Options as pill/card buttons */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:pl-9">
-                    {(Array.isArray(q.options) ? q.options : ["Opción A", "Opción B", "Opción C"]).map((opt, oIdx) => {
+                    {(Array.isArray(q.options) ? q.options : ["Option A", "Option B", "Option C"]).map((opt, oIdx) => {
                       const isSelected = selectedOption === opt;
                       return (
                         <button
@@ -2047,11 +2050,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               {isLoading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Generando ruta adaptada...</span>
+                  <span>Generating tailored roadmap...</span>
                 </>
               ) : (
                 <>
-                  GENERAR RUTA DE TRABAJO 🚀
+                  GENERATE WORK ROADMAP 🚀
                 </>
               )}
             </button>
@@ -2062,7 +2065,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               onClick={() => handleGenerateFromSurvey(false)}
               className="w-full py-2.5 text-xs sm:text-sm text-zinc-500 hover:text-zinc-300 font-medium transition-colors text-center cursor-pointer disabled:opacity-50"
             >
-              Omitir y comenzar directo
+              Skip and start right away
             </button>
           </div>
         </motion.div>
@@ -2094,7 +2097,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       >
         <div className="flex items-center justify-between mb-2 border-b border-zinc-800 pb-4">
           <h2 className="text-xl font-medium text-white flex items-center gap-2">
-            <BrainCircuit className="text-green-500" /> Afinando Detalles
+            <BrainCircuit className="text-green-500" /> Refining Details
           </h2>
         </div>
 
@@ -2112,7 +2115,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           <input
             type="text"
             className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-green-500"
-            placeholder="Escribe tu respuesta..."
+            placeholder="Type your answer..."
             value={briefingInput}
             onChange={e => setBriefingInput(e.target.value)}
             disabled={isLoading}
@@ -2131,7 +2134,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
           ) : (
             <>
-              <Play className="w-4 h-4 fill-black inline mr-1" /> Generar Pasos e Iniciar Sesión
+              <Play className="w-4 h-4 fill-black inline mr-1" /> Generate Steps & Start Session
             </>
           )}
         </button>
@@ -2155,7 +2158,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           <div className="bg-zinc-900 p-5 rounded-3xl shadow-xl border border-zinc-800/50">
             <div className="flex justify-between items-center mb-3">
               <span className="font-mono text-[10px] sm:text-xs text-zinc-400 flex items-center gap-2 tracking-widest">
-                <Target className="w-4 h-4 text-emerald-500" /> RENDIMIENTO (C.L.A.P.)
+                <Target className="w-4 h-4 text-emerald-500" /> PERFORMANCE (C.L.A.P.)
               </span>
             </div>
             <div className="h-3 w-full bg-zinc-950 rounded-full overflow-hidden shadow-inner flex items-center">
@@ -2169,7 +2172,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           <div className="bg-zinc-900 p-5 rounded-3xl shadow-xl border border-zinc-800/50">
             <div className="flex justify-between items-center mb-3">
               <span className="font-mono text-[10px] sm:text-xs text-zinc-400 flex items-center gap-2 tracking-widest">
-                <Activity className="w-4 h-4 text-rose-500" /> CARGA COGNITIVA
+                <Activity className="w-4 h-4 text-rose-500" /> COGNITIVE LOAD
               </span>
             </div>
             <div className="h-3 w-full bg-zinc-950 rounded-full overflow-hidden shadow-inner flex items-center">
@@ -2183,7 +2186,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           <div className="bg-zinc-900 p-5 rounded-3xl shadow-xl border border-zinc-800/50 flex flex-col justify-between">
             <div className="flex justify-between items-center mb-2">
               <span className="font-mono text-[10px] sm:text-xs text-zinc-400 flex items-center gap-2 tracking-widest">
-                <BrainCircuit className="w-4 h-4 text-cyan-400" /> RED NEURONAL IA
+                <BrainCircuit className="w-4 h-4 text-cyan-400" /> AI NEURAL NETWORK
               </span>
               <span className="font-mono text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold uppercase tracking-wider">
                 TF.js 4.22
@@ -2191,10 +2194,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold font-mono text-white tracking-wide">
-                {aiPrediction ? aiPrediction.className : (isAIBrainReady ? 'ENFOQUE' : 'CALIBRANDO')}
+                {aiPrediction ? aiPrediction.className : (isAIBrainReady ? 'FOCUS' : 'CALIBRATING')}
               </span>
               <span className="text-xs font-mono text-zinc-400 font-semibold">
-                {aiPrediction ? `${(aiPrediction.confidence * 100).toFixed(0)}% Conf.` : (isAIBrainReady ? '100%' : 'Listo')}
+                {aiPrediction ? `${(aiPrediction.confidence * 100).toFixed(0)}% Conf.` : (isAIBrainReady ? '100%' : 'Ready')}
               </span>
             </div>
             <div className="w-full bg-zinc-950 h-1.5 rounded-full overflow-hidden mt-2">
@@ -2212,7 +2215,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
           <div className="relative rounded-3xl overflow-hidden bg-zinc-950 flex-[3] flex flex-col items-center justify-center flex-1 w-full min-h-[420px] p-4 shadow-2xl border border-zinc-900">
 
 
-            {/* Protagonista Visual: FocusBud Robot con Bocadillo Empático Estilizado */}
+            {/* Visual Protagonist: FocusBud Robot with Styled Empathetic Speech Bubble */}
             <div className="relative z-10 flex flex-col items-center justify-center w-full h-full my-auto py-8">
               <FocusBudWidget
                 state={currentFocusState}
@@ -2226,14 +2229,14 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
             </div>
 
-            {/* Barra Inferior: Estado de Inferencia, Postura y Botones */}
+            {/* Bottom Bar: Inference Status, Posture & Controls */}
             <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2 z-20 pointer-events-auto">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-md bg-black/60 backdrop-blur-md font-mono text-[10px] text-zinc-400 flex items-center gap-2 shadow-2xl border border-zinc-800">
-                  <div className={`w-2 h-2 rounded-full ${isPaused ? 'bg-blue-500' : 'bg-red-500 animate-pulse'}`} /> {isPaused ? 'EN PAUSA' : 'INFERENCIA LOCAL (TF.js)'}
+                  <div className={`w-2 h-2 rounded-full ${isPaused ? 'bg-blue-500' : 'bg-red-500 animate-pulse'}`} /> {isPaused ? 'PAUSED' : 'LOCAL INFERENCE (TF.js)'}
                 </span>
 
-                {/* Chip de Higiene Postural Edge (100% Determinista / Local) */}
+                {/* Edge Postural Hygiene Chip (100% Deterministic / Local) */}
                 <span className={`px-2.5 py-1.5 rounded-md backdrop-blur-md font-mono text-[10px] flex items-center gap-1.5 shadow-2xl border transition-all duration-300 ${postureHygiene.bg} ${postureHygiene.color}`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-current" />
                   {postureHygiene.label}
@@ -2245,24 +2248,24 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   type="button"
                   onClick={handleTriggerTestGrounding}
                   className="px-2.5 py-1 rounded text-[10px] font-mono tracking-wider uppercase bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 hover:text-emerald-200 border border-emerald-800/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-                  title="Simular descanso para probar ejercicios de grounding"
+                  title="Simulate break to test grounding exercises"
                 >
-                  <span>☕ </span> {timerMode === 'SHORT_BREAK' || timerMode === 'LONG_BREAK' ? 'VOLVER AL ENFOQUE' : 'PROBAR GROUNDING'}
+                  <span>☕ </span> {timerMode === 'SHORT_BREAK' || timerMode === 'LONG_BREAK' ? 'BACK TO FOCUS' : 'TEST GROUNDING'}
                 </button>
 
                 <button
                   onClick={() => handleRecalibrate(false)}
                   className="px-2.5 py-1 rounded text-[10px] font-mono tracking-wider uppercase bg-zinc-800/60 hover:bg-zinc-700/60 text-zinc-400 hover:text-zinc-200 border border-zinc-700/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-lg"
-                  title="Reiniciar calibración biométrica"
+                  title="Restart biometric calibration"
                 >
-                  <span>🔄</span> RECALIBRAR IA
+                  <span>🔄</span> RECALIBRATE AI
                 </button>
               </div>
             </div>
 
             {isPaused && (
               <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-20 flex items-center justify-center pointer-events-none">
-                <span className="text-3xl font-black tracking-[0.3em] text-blue-400 font-mono drop-shadow-[0_0_20px_rgba(59,130,246,0.8)]">PAUSADO</span>
+                <span className="text-3xl font-black tracking-[0.3em] text-blue-400 font-mono drop-shadow-[0_0_20px_rgba(59,130,246,0.8)]">PAUSED</span>
               </div>
             )}
           </div>
@@ -2272,7 +2275,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
             {/* Header */}
             <div className="px-5 py-4 bg-zinc-950/50 border-b border-zinc-800 flex items-center gap-2 shrink-0">
               <MessageSquare className="w-5 h-5 text-emerald-500" />
-              <span className="font-mono text-sm tracking-widest text-zinc-300 font-semibold uppercase">Chat de Asistencia</span>
+              <span className="font-mono text-sm tracking-widest text-zinc-300 font-semibold uppercase">Support Chat</span>
             </div>
             {/* Messages view */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 no-scrollbar scroll-smooth">
@@ -2297,12 +2300,12 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   className="max-w-[95%] self-start bg-zinc-900 border-2 border-emerald-500/30 rounded-2xl p-5 flex flex-col gap-4 shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 >
                   <div className="flex flex-col gap-1.5">
-                    <span className="font-mono text-[10px] tracking-widest text-emerald-500 uppercase font-bold">💡 Propuesta de Nueva Misión</span>
+                    <span className="font-mono text-[10px] tracking-widest text-emerald-500 uppercase font-bold">💡 New Mission Proposal</span>
                     <h4 className="text-white font-semibold text-sm leading-snug">{proposedChange.proposedTask}</h4>
                   </div>
 
                   <div className="flex flex-col gap-1 border-t border-zinc-800 pt-3">
-                    <span className="font-mono text-[9px] tracking-wider text-zinc-500 uppercase">Micro-pasos de Acción:</span>
+                    <span className="font-mono text-[9px] tracking-wider text-zinc-500 uppercase">Action Micro-Steps:</span>
                     <ul className="text-xs text-zinc-400 space-y-1.5 mt-1 list-disc pl-4 leading-relaxed">
                       {proposedChange.proposedSteps.map((step, idx) => (
                         <li key={idx}>{step}</li>
@@ -2315,13 +2318,13 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                       onClick={handleAcceptProposal}
                       className="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl transition-colors cursor-pointer uppercase tracking-wider"
                     >
-                      Aceptar Nueva Tarea
+                      Accept New Task
                     </button>
                     <button
                       onClick={() => setProposedChange(null)}
                       className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 hover:text-white text-zinc-400 text-xs rounded-xl transition-colors cursor-pointer"
                     >
-                      Descartar
+                      Dismiss
                     </button>
                   </div>
                 </motion.div>
@@ -2336,7 +2339,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   type="text"
                   value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
-                  placeholder="Pregunta sin perder el foco..."
+                  placeholder="Ask without losing focus..."
                   className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 text-white placeholder-zinc-600 font-mono transition-shadow min-w-0"
                 />
                 <button type="submit" disabled={isChatLoading || !chatInput.trim()} className="bg-emerald-500 text-black px-4 rounded-xl flex items-center justify-center hover:bg-emerald-400 disabled:opacity-50 disabled:hover:bg-emerald-500 transition-colors shrink-0">
@@ -2348,7 +2351,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         </div>
       </motion.div>
 
-      {/* RIGHT PANEL: IA MENTOR DASHBOARD - Staged GPU Entrance */}
+      {/* RIGHT PANEL: AI MENTOR DASHBOARD - Staged GPU Entrance */}
       <motion.div
         initial={{ opacity: 0, x: 24 }}
         animate={{ opacity: 1, x: 0 }}
@@ -2357,7 +2360,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
       >
 
         <div className="bg-zinc-900 rounded-3xl flex-1 flex flex-col overflow-hidden shadow-2xl border border-zinc-900 min-h-[500px] relative">
-          {/* Celebración Kawaii Anime Multivariada con Partículas 60 FPS */}
+          {/* Multivariate Kawaii Anime Celebration with 60 FPS Particles */}
           <KawaiiRewardCelebration
             isVisible={isShowingReward}
             archetypeIndex={rewardArchetypeIdx}
@@ -2371,10 +2374,10 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               </div>
               <div className="flex flex-col gap-0.5 min-w-0">
                 <h2 className="text-white text-base sm:text-lg tracking-tight font-medium flex items-center gap-2">
-                  Mentor IA Autónomo
+                  Autonomous AI Mentor
                 </h2>
                 <p className="text-xs font-mono text-zinc-400 truncate max-w-[220px]" title={task}>
-                  META: <span className="text-emerald-400 font-semibold">{task || 'Sesión de Enfoque'}</span>
+                  GOAL: <span className="text-emerald-400 font-semibold">{task || 'Focus Session'}</span>
                 </p>
               </div>
             </div>
@@ -2384,12 +2387,12 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                 onClick={() => setIsPaused(!isPaused)}
                 className={`flex items-center justify-center w-10 h-10 rounded-xl shadow-lg border transition-colors cursor-pointer ${isPaused ? 'bg-blue-500 border-blue-400 text-black' : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-zinc-300'
                   }`}
-                title="Pausar / Reanudar (Tecla Q)"
+                title="Pause / Resume (Press Q)"
               >
                 {isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
               </button>
 
-              {/* HUD Pomodoro con Indicador de Estado */}
+              {/* Pomodoro HUD with Status Indicator */}
               <div className={`flex items-center gap-2 px-3 py-1.5 bg-black border rounded-xl transition-all ${
                 timerMode === 'WORK'
                   ? isPaused ? 'border-zinc-800 opacity-60' : 'border-green-500/40 shadow-[0_0_20px_rgba(34,197,94,0.15)]'
@@ -2402,11 +2405,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                     {timerMode === 'WORK' ? (
                       <>
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        🟢 ENFOQUE | BLOQUE {Math.min(completedBlocks + 1, totalTargetBlocks)}/{totalTargetBlocks}
+                        🟢 FOCUS | BLOCK {Math.min(completedBlocks + 1, totalTargetBlocks)}/{totalTargetBlocks}
                       </>
                     ) : (
                       <>
-                        ☕ DESCANSO
+                        ☕ BREAK
                       </>
                     )}
                   </span>
@@ -2422,17 +2425,17 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   </div>
                 </div>
 
-                {/* Botón de configuración de bloques */}
+                {/* Block configuration button */}
                 <button
                   onClick={() => setIsTimerConfigOpen(!isTimerConfigOpen)}
                   className="p-1 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors cursor-pointer"
-                  title="Ajustar minutos de enfoque / descanso"
+                  title="Adjust focus / break minutes"
                 >
                   <Sliders className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {/* Popover de Ajuste Rápido Pomodoro */}
+              {/* Pomodoro Quick Adjustment Popover */}
               <AnimatePresence>
                 {isTimerConfigOpen && (
                   <motion.div
@@ -2442,7 +2445,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                     className="absolute right-0 top-14 z-50 bg-zinc-900/95 backdrop-blur-md border border-zinc-800 rounded-2xl p-3 shadow-2xl w-64 text-xs space-y-2 select-none"
                   >
                     <div className="flex justify-between items-center pb-2 border-b border-zinc-800 text-[11px] font-mono text-zinc-400 font-bold uppercase tracking-wider">
-                      <span>Calibrar Pomodoro</span>
+                      <span>Calibrate Pomodoro</span>
                       <button onClick={() => setIsTimerConfigOpen(false)} className="text-zinc-500 hover:text-zinc-300 p-0.5 cursor-pointer">✕</button>
                     </div>
                     <div className="space-y-1.5">
@@ -2462,7 +2465,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                       >
                         <div>
                           <div className="font-semibold text-xs">25 min / 5 min</div>
-                          <div className="text-[10px] text-zinc-500">Pomodoro Clásico</div>
+                          <div className="text-[10px] text-zinc-500">Classic Pomodoro</div>
                         </div>
                         <span className="text-[11px] font-mono text-emerald-400 font-bold">25/5</span>
                       </button>
@@ -2482,7 +2485,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                       >
                         <div>
                           <div className="font-semibold text-xs">40 min / 10 min</div>
-                          <div className="text-[10px] text-zinc-500">Deep Work Moderado</div>
+                          <div className="text-[10px] text-zinc-500">Moderate Deep Work</div>
                         </div>
                         <span className="text-[11px] font-mono text-cyan-400 font-bold">40/10</span>
                       </button>
@@ -2502,7 +2505,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                       >
                         <div>
                           <div className="font-semibold text-xs">50 min / 10 min</div>
-                          <div className="text-[10px] text-zinc-500">Sprint Extendido</div>
+                          <div className="text-[10px] text-zinc-500">Extended Sprint</div>
                         </div>
                         <span className="text-[11px] font-mono text-purple-400 font-bold">50/10</span>
                       </button>
@@ -2522,11 +2525,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
               />
             ) : currentStepIdx < steps.length ? (
               <div className="flex-1 flex flex-col justify-between">
-                {/* a) Insignia de Progreso y Barra Delgada */}
+                {/* a) Progress Badge & Slim Bar */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
                     <span className="font-semibold tracking-wider text-zinc-300">
-                      PASO {currentStepIdx + 1} DE {steps.length}
+                      STEP {currentStepIdx + 1} OF {steps.length}
                     </span>
                     <span className="text-emerald-400 font-bold">
                       {Math.round((currentStepIdx / steps.length) * 100)}%
@@ -2542,7 +2545,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   </div>
                 </div>
 
-                {/* b) Tarjeta de Acción Única */}
+                {/* b) Single Action Card */}
                 <div className="my-auto py-6 flex items-center justify-center flex-1 w-full min-h-[220px]">
                   <motion.div
                     key={`step-card-${currentStepIdx}`}
@@ -2550,34 +2553,34 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.15, ease: "easeOut" }}
                     className={`w-full p-6 sm:p-8 rounded-3xl flex flex-col items-center justify-center text-center relative group transition-colors duration-200 ${
-                      /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '')
+                      /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '')
                         ? 'bg-gradient-to-b from-amber-950/30 via-zinc-950/90 to-zinc-950 border border-amber-500/40 shadow-[0_0_35px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20'
                         : 'bg-zinc-950 border border-zinc-800/80 shadow-2xl hover:border-emerald-500/30'
                     }`}
                   >
-                    {/^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? (
+                    {/^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '') ? (
                       <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono font-semibold uppercase tracking-wider mb-5 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
                         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                        Pausa Somática / Biorregulación
+                        Somatic Pause / Bio-Regulation
                       </div>
                     ) : (
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono font-medium uppercase tracking-wider mb-5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Paso Activo
+                        Active Step
                       </div>
                     )}
 
                     <p className={`text-xl sm:text-2xl font-semibold leading-relaxed tracking-tight max-w-md break-words select-text ${
-                      /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? 'text-amber-100 font-medium' : 'text-white'
+                      /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '') ? 'text-amber-100 font-medium' : 'text-white'
                     }`}>
-                      {steps[currentStepIdx] || 'Cargando paso...'}
+                      {steps[currentStepIdx] || 'Loading step...'}
                     </p>
                   </motion.div>
                 </div>
 
-                {/* c) Botón de Completado */}
+                {/* c) Complete Step Button */}
                 <div className="pt-2 relative">
-                  {/* Píldora de Recompensa de Dopamina y Gamificación */}
+                  {/* Dopamine & Gamification Reward Pill */}
                   <div className="flex items-center justify-center mb-2.5">
                     <div className={`px-4 py-1.5 rounded-full border text-[11px] font-mono font-bold tracking-wider uppercase flex items-center gap-2 transition-all duration-300 ${
                       isShowingReward
@@ -2585,7 +2588,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                         : 'bg-zinc-950/80 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
                     }`}>
                       <Zap className={`w-3.5 h-3.5 ${isShowingReward ? 'animate-bounce text-amber-400' : 'text-emerald-400'}`} />
-                      <span>ENERGÍA +100 CLAP • DOPAMINA</span>
+                      <span>ENERGY +100 CLAP • DOPAMINE</span>
                       <Sparkles className={`w-3.5 h-3.5 ${isShowingReward ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
                     </div>
                   </div>
@@ -2595,25 +2598,25 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                     className={`w-full py-4 sm:py-5 font-black text-base sm:text-lg rounded-2xl transition-all flex items-center justify-center gap-2 relative group overflow-hidden active:scale-[0.99] cursor-pointer ${
                       isShowingReward
                         ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 text-zinc-950 shadow-[0_0_40px_rgba(52,211,153,0.5)] scale-[1.02]'
-                        : /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '')
+                        : /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '')
                         ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-zinc-950 shadow-[0_0_30px_rgba(245,158,11,0.25)]'
                         : 'bg-green-500 hover:bg-green-400 text-black shadow-[0_0_30px_rgba(34,197,94,0.25)]'
                     }`}
                   >
-                    {isShowingReward ? "¡VAMOS CON TODO! 🚀" : /^PAUSA(\s+SOMÁTICA)?/i.test(steps[currentStepIdx] || '') ? "CONCLUIR PAUSA Y CONTINUAR ▶️" : "COMPLETAR PASO"}
+                    {isShowingReward ? "FULL MOMENTUM! 🚀" : /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '') ? "FINISH PAUSE & CONTINUE ▶️" : "COMPLETE STEP"}
                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                   </button>
 
                   {currentStepIdx + 1 < steps.length ? (
                     <div className="flex items-center justify-center gap-1.5 mt-2.5 text-[11px] font-mono text-zinc-400">
-                      <span className="text-zinc-500 font-semibold">SIGUIENTE:</span>
+                      <span className="text-zinc-500 font-semibold">NEXT:</span>
                       <span className="truncate max-w-[280px] text-zinc-300 font-medium">
                         {steps[currentStepIdx + 1]}
                       </span>
                     </div>
                   ) : (
                     <p className="text-[10px] uppercase tracking-wider font-mono text-center text-emerald-400/80 mt-2.5 font-semibold">
-                      ÚLTIMO PASO • META CASI ALCANZADA
+                      FINAL STEP • GOAL ALMOST REACHED
                     </p>
                   )}
                 </div>
@@ -2633,21 +2636,21 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
                 <div className="space-y-0.5 shrink-0">
                   <h3 className="font-black text-2xl sm:text-3xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-green-300 to-teal-200">
-                    ¡SESIÓN COMPLETADA!
+                    SESSION COMPLETED!
                   </h3>
                   <p className="text-xs sm:text-sm text-zinc-400 font-medium truncate max-w-[320px]">
-                    {task || "Sesión de Trabajo"}
+                    {task || "Work Session"}
                   </p>
                 </div>
 
-                {/* Métricas Resumen de la Sesión */}
+                {/* Session Summary Metrics */}
                 <div className="grid grid-cols-2 gap-2 w-full my-0.5 shrink-0">
                   <div className="px-3 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 font-mono text-xs text-zinc-400 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-emerald-400" /> Tiempo:</span>
+                    <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-emerald-400" /> Time:</span>
                     <strong className="text-white">{formatTime(elapsedTime)}</strong>
                   </div>
                   <div className="px-3 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 font-mono text-xs text-zinc-400 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5"><BrainCircuit className="w-3.5 h-3.5 text-cyan-400" /> Foco Med:</span>
+                    <span className="flex items-center gap-1.5"><BrainCircuit className="w-3.5 h-3.5 text-cyan-400" /> Avg Focus:</span>
                     <strong className="text-white">
                       {focusSamplesRef.current.length > 0 
                         ? `${Math.round(focusSamplesRef.current.reduce((a, b) => a + b, 0) / focusSamplesRef.current.length)}%` 
@@ -2656,35 +2659,35 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
                   </div>
                 </div>
 
-                {/* Tarjeta de Debriefing Cognitivo con Meta Muse Spark en Baseten con scroll interno limpio */}
+                {/* Cognitive Debrief Card with Meta Muse Spark on Baseten */}
                 <div className="w-full text-left p-3.5 rounded-2xl bg-zinc-900/90 border border-purple-500/30 shadow-inner space-y-1.5 max-h-36 sm:max-h-44 overflow-y-auto custom-scrollbar">
                   <div className="flex items-center justify-between sticky top-0 bg-zinc-900/95 py-0.5 z-10 backdrop-blur-sm">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-purple-400" />
                       <span className="text-[10px] font-mono tracking-wider uppercase text-purple-300 font-bold">
-                        Debriefing Cognitivo • Meta Muse Spark
+                        Cognitive Debrief • Meta Muse Spark
                       </span>
                     </div>
                     {isDebriefLoading && (
-                      <span className="text-[9px] font-mono text-zinc-400 animate-pulse">Sintetizando...</span>
+                      <span className="text-[9px] font-mono text-zinc-400 animate-pulse">Synthesizing...</span>
                     )}
                   </div>
 
                   <p className="text-xs sm:text-sm text-zinc-200 leading-relaxed font-sans">
                     {isDebriefLoading ? (
-                      <span className="text-zinc-500 italic">Generando análisis cognitivo con Meta Muse Spark en Baseten...</span>
+                      <span className="text-zinc-500 italic">Generating cognitive analysis with Meta Muse Spark on Baseten...</span>
                     ) : (
-                      sessionDebrief || "Excelente disciplina. Has mantenido estabilidad cognitiva y cerrado el ciclo de trabajo."
+                      sessionDebrief || "Outstanding discipline. You maintained cognitive stability and closed your work cycle."
                     )}
                   </p>
                 </div>
 
-                {/* Botón Nueva Sesión siempre visible y clickeable */}
+                {/* New Session Button always visible and clickable */}
                 <button
                   onClick={handleStartNewSession}
                   className="w-full mt-1 py-3.5 px-6 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm sm:text-base rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] active:scale-[0.99] uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0"
                 >
-                  INICIAR NUEVA SESIÓN
+                  START NEW SESSION
                 </button>
               </motion.div>
             ) : null}
@@ -2697,11 +2700,11 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
 
   return (
     <>
-      {/* Sensores de hardware permanentes (100% On-Device Zero-Latency) */}
+      {/* Permanent hardware sensors (100% On-Device Zero-Latency) */}
       <video ref={videoRef} className="hidden" playsInline autoPlay muted />
       <canvas ref={canvasRef} width={320} height={240} className="hidden" />
 
-      {/* Pantalla Cinemática de Pre-Calentamiento de Hardware (Paso 1) */}
+      {/* Cinematic Hardware Pre-Warmup Screen */}
       <PreWarmupScreen
         isVisible={isPreWarmupVisible}
         steps={warmupSteps}
@@ -2712,7 +2715,7 @@ Concentrémonos en el primer sub-paso. ¡Tú puedes!`
         }}
       />
 
-      {/* Barra Lateral Colapsable Gemini / Android Workspace (Paso 5) */}
+      {/* Collapsible Sidebar Workspace */}
       <CollapsibleSidebar
         currentTask={task}
         onNewSession={handleStartNewSession}

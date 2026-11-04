@@ -89,20 +89,20 @@
     13.18505181806535
   ],
   "classNames": [
-    "ESTUDIO NORMAL / NEUTRO",
-    "ENFOQUE PROFUNDO (FLOW)",
-    "DISTRACCIÓN",
-    "FATIGA",
-    "SOBREESTIMULACIÓN",
-    "AGOBIO POSTURAL"
+    "NORMAL STUDY / NEUTRAL",
+    "DEEP FOCUS (FLOW)",
+    "DISTRACTION",
+    "FATIGUE",
+    "OVERSTIMULATION",
+    "POSTURAL STRAIN"
   ],
   "classes": [
-    "ESTUDIO NORMAL / NEUTRO",
-    "ENFOQUE PROFUNDO (FLOW)",
-    "DISTRACCIÓN",
-    "FATIGA",
-    "SOBREESTIMULACIÓN",
-    "AGOBIO POSTURAL"
+    "NORMAL STUDY / NEUTRAL",
+    "DEEP FOCUS (FLOW)",
+    "DISTRACTION",
+    "FATIGUE",
+    "OVERSTIMULATION",
+    "POSTURAL STRAIN"
   ],
   "output_classes": 6,
   "accuracy": "93.64%",

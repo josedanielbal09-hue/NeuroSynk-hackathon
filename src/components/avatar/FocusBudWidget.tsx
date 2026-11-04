@@ -57,7 +57,7 @@ export const FocusBudWidget: React.FC<FocusBudWidgetProps> = React.memo(({
     
     // Limpiar cualquier residuo de razonamiento en inglés o tags
     let cleaned = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#"`]/g, '').trim();
-    if (/Starts with|Need to consider|We should|Count:|PERCLOS|User prompt/i.test(cleaned)) {
+    if (/Starts with an? uppercase|Need to consider:|Count:\s*\d|User prompt:/i.test(cleaned)) {
       cleaned = getRandomStateMessage(state);
     }
     

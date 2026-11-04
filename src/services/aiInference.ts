@@ -27,7 +27,7 @@ export interface AIPredictionResult {
   probabilities: number[];
   focusScore: number;       // 0 - 100
   stressLevel: number;      // 0 - 100
-  perclos: number;          // 0 - 100 (%) PERCLOS clínico
+  perclos: number;          // 0 - 100 (%) Clinical PERCLOS
   statusMessage: string;
   badgeColor: string;
   badgeBg: string;
@@ -39,11 +39,11 @@ let loadedMetadata: ModelMetadata | null = null;
 let isModelLoading = false;
 let inferenceCounter = 0;
 
-// Estado del Suavizado Exponencial (EMA) a nivel de módulo (AGENTS.md: alpha = 0.45)
+// Module-level Exponential Moving Average (EMA) smoothing state (alpha = 0.45)
 let emaProbabilities: number[] | null = null;
 const EMA_ALPHA = 0.45;
 
-// Buffer Temporal Circular para cálculo de PERCLOS (Ventana deslizante de 30 segundos)
+// Circular Temporal Buffer for PERCLOS calculation (30-second sliding window)
 interface BiometricSample {
   timestamp: number;
   ear_mean: number;
@@ -51,11 +51,11 @@ interface BiometricSample {
   pitch: number;
   yaw: number;
 }
-const PERCLOS_WINDOW_MS = 30000; // 30 segundos
-const EAR_CLOSURE_THRESHOLD = 0.20; // Umbral de oclusión palpebral (80% cerrado)
+const PERCLOS_WINDOW_MS = 30000;
+const EAR_CLOSURE_THRESHOLD = 0.20;
 const temporalBuffer: BiometricSample[] = [];
 
-// Histéresis Temporal de Estado Clínico (Umbral sostenido > 400ms para evitar oscilaciones)
+// Clinical State Temporal Hysteresis (>400ms sustained threshold to prevent flicker)
 let sustainedClassIdx: number = 0;
 let candidateClassIdx: number = 0;
 let candidateStartTime: number = Date.now();
@@ -69,7 +69,7 @@ export function resetEMA(): void {
   candidateStartTime = Date.now();
 }
 
-// Calentamiento Basal (primeros 20 minutos de sesión: -20% estrés, +5% foco)
+// Baseline Warm-Up (first 20 minutes of session: -20% stress, +5% focus)
 let sessionStartTime = Date.now();
 
 export function resetSessionTimer(): void {
@@ -87,17 +87,15 @@ export function getWarmUpRemainingMinutes(): number {
 }
 
 /**
- * Calcula el PERCLOS (Percentage of Eyelid Closure over Time) según estándares clínicos
+ * Calculates PERCLOS (Percentage of Eyelid Closure over Time) per clinical standards
  */
 export function calculatePERCLOS(currentTime: number): number {
-  // Purgar muestras más antiguas que la ventana deslizante
   while (temporalBuffer.length > 0 && (currentTime - temporalBuffer[0].timestamp) > PERCLOS_WINDOW_MS) {
     temporalBuffer.shift();
   }
 
   if (temporalBuffer.length === 0) return 0;
 
-  // Conteo de muestras con cierre palpebral activo
   const closedCount = temporalBuffer.filter(s => s.ear_min < EAR_CLOSURE_THRESHOLD || s.ear_mean < EAR_CLOSURE_THRESHOLD).length;
   const perclosRatio = closedCount / temporalBuffer.length;
   return Math.round(perclosRatio * 100);
@@ -113,16 +111,16 @@ export function getTemporalBufferStats(): { perclos: number; sampleCount: number
 }
 
 export const DEFAULT_CLASS_NAMES = [
-  'ESTUDIO NORMAL / NEUTRO',     // Clase 0
-  'ENFOQUE PROFUNDO (FLOW)',      // Clase 1
-  'DISTRACCIÓN COGNITIVA',       // Clase 2
-  'FATIGA OCULAR / SUEÑO',       // Clase 3
-  'SOBREESTIMULACIÓN',           // Clase 4
-  'AGOBIO POSTURAL'              // Clase 5
+  'NORMAL STUDY / NEUTRAL',      // Class 0
+  'DEEP FOCUS (FLOW)',           // Class 1
+  'COGNITIVE DISTRACTION',       // Class 2
+  'EYE FATIGUE / DROWSINESS',    // Class 3
+  'OVERSTIMULATION',             // Class 4
+  'POSTURAL STRAIN'              // Class 5
 ];
 
 /**
- * Carga asíncrona del modelo de Red Neuronal entrenado y su metadata
+ * Async loader for the trained Neural Network model and its metadata
  */
 export async function loadNeuroSynkBrain(): Promise<{ isReady: boolean; metadata: ModelMetadata | null }> {
   if (loadedModel && loadedMetadata) {
@@ -138,68 +136,67 @@ export async function loadNeuroSynkBrain(): Promise<{ isReady: boolean; metadata
   try {
     const tf = (window as any).tf;
     if (!tf) {
-      console.warn("⚠️ Esperando a que TensorFlow.js esté disponible...");
+      console.warn("⚠️ Waiting for TensorFlow.js runtime...");
       isModelLoading = false;
       return { isReady: false, metadata: null };
     }
 
-    // 1. Cargar Metadata de Normalización Z-Score (12 Dimensiones)
+    // 1. Load 12-D Z-Score Normalization Metadata
     const metaRes = await fetch('/models/metadata.json');
     if (!metaRes.ok) {
-      throw new Error(`No se pudo cargar /models/metadata.json (${metaRes.status})`);
+      throw new Error(`Could not load /models/metadata.json (${metaRes.status})`);
     }
     loadedMetadata = await metaRes.json();
 
-    // 2. Cargar Red Neuronal de TensorFlow.js (Definitive Pure Core v3.0)
+    // 2. Load TensorFlow.js Neural Network (Definitive Pure Core v3.0)
     loadedModel = await tf.loadLayersModel('/models/model.json');
 
-    // 3. Pre-compilación asíncrona de shaders WebGL (Zero-Latency Warmup)
+    // 3. Async WebGL shader pre-compilation (Zero-Latency Warmup)
     try {
       tf.tidy(() => {
         const dummyInput = tf.zeros([1, 12]);
         const res = loadedModel.predict(dummyInput) as any;
         if (res && res.dataSync) res.dataSync();
       });
-      console.log("⚡ [NeuroSynk AI Core] Shaders WebGL pre-compilados (Warmup exitoso).");
+      console.log("⚡ [NeuroSynk AI Core] WebGL shaders pre-compiled (Warmup complete).");
     } catch (warmupErr) {
-      console.warn("⚠️ [NeuroSynk AI Warmup] Aviso menor en warmup:", warmupErr);
+      console.warn("⚠️ [NeuroSynk AI Warmup] Minor warmup notice:", warmupErr);
     }
 
-    console.log("🧠 [NeuroSynk AI Core] Red Neuronal cargada con éxito (10,739 muestras). Precisión esperada:", loadedMetadata?.accuracy || "93.6%");
+    console.log("🧠 [NeuroSynk AI Core] Neural Network loaded successfully (10,739 samples). Expected accuracy:", loadedMetadata?.accuracy || "93.6%");
     isModelLoading = false;
     return { isReady: true, metadata: loadedMetadata };
   } catch (error) {
-    console.error("❌ Error al cargar la Red Neuronal de NeuroSynk:", error);
+    console.error("❌ Failed to load NeuroSynk Neural Network:", error);
     isModelLoading = false;
     return { isReady: false, metadata: null };
   }
 }
 
 /**
- * Inferencia de Inteligencia Artificial en Tiempo Real (<2ms)
- * Procesamiento de 12 dimensiones con Z-score, suavizado EMA y factor de co-ocurrencia clínica
+ * Real-Time AI Inference (<2ms)
+ * 12-dimension processing with Z-score normalization, EMA smoothing, and clinical co-occurrence factor
  */
 export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredictionResult {
   const tf = typeof window !== 'undefined' ? (window as any).tf : null;
 
-  // Fallback seguro si la red aún no termina de cargar
+  // Safe fallback if neural network has not finished loading yet
   if (!loadedModel || !loadedMetadata || !tf) {
     return {
       classIndex: 0,
-      className: 'ESTUDIO NORMAL / NEUTRO (CALIBRANDO)',
+      className: 'NORMAL STUDY / NEUTRAL (CALIBRATING)',
       confidence: 0.9,
       probabilities: [0.9, 0.02, 0.02, 0.02, 0.02, 0.02],
       focusScore: 85,
       stressLevel: 10,
       perclos: 0,
-      statusMessage: 'EN ESTADO DE FLUJO (CALIBRACIÓN)',
+      statusMessage: 'IN FLOW STATE (CALIBRATING)',
       badgeColor: 'text-emerald-400',
       badgeBg: 'bg-emerald-500/10',
       badgeBorder: 'border-emerald-500/30'
     };
   }
 
-  // Vector de 12 dimensiones biométricas estrictas
   const raw = [
     metrics.ear_mean,
     metrics.ear_min,
@@ -215,7 +212,6 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
     metrics.roll_angle_mean
   ];
 
-  // Normalización Z-score determinista según metadata.json
   const normalized = raw.map((val, idx) => {
     const mean = loadedMetadata!.featureMeans[idx] ?? 0;
     const std = loadedMetadata!.featureStds[idx] || 1.0;
@@ -223,34 +219,29 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
   });
 
   try {
-    // 1. Inferencia aislada estrictamente dentro de tf.tidy para erradicar fugas de memoria
     const rawProbs: number[] = tf.tidy(() => {
       const inputTensor = tf.tensor2d([normalized], [1, 12]);
       const outputTensor = loadedModel.predict(inputTensor) as any;
       return Array.from(outputTensor.dataSync());
     });
 
-    // 2. Suavizado Exponencial (EMA con alpha = 0.25) sobre las 6 probabilidades
     if (!emaProbabilities || emaProbabilities.length !== rawProbs.length) {
       emaProbabilities = [...rawProbs];
     } else {
       emaProbabilities = rawProbs.map((p, i) => EMA_ALPHA * p + (1.0 - EMA_ALPHA) * (emaProbabilities![i] ?? p));
     }
 
-    // Renormalización unitaria determinista: sum(P) = 1.000000
     const sumEma = emaProbabilities.reduce((a, b) => a + b, 0) || 1.0;
     const smoothedProbs = emaProbabilities.map(p => p / sumEma);
 
-    // Diagnóstico de memoria cada 120 inferencias (2 segundos a 60 FPS)
     inferenceCounter++;
     if (inferenceCounter % 120 === 0 && tf.memory) {
       const mem = tf.memory();
       if (mem.numTensors >= 20) {
-        console.warn(`⚠️ [NeuroSynk AI Warning] Tensores en memoria: ${mem.numTensors}`);
+        console.warn(`⚠️ [NeuroSynk AI Warning] Active tensors in memory: ${mem.numTensors}`);
       }
     }
 
-    // 3. Muestreo en Buffer Temporal y Cálculo de PERCLOS
     const now = Date.now();
     temporalBuffer.push({
       timestamp: now,
@@ -261,7 +252,6 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
     });
     const currentPerclos = calculatePERCLOS(now);
 
-    // 4. Selección de la clase dominante con Histéresis Temporal (>400ms sostenido)
     let maxProb = -1;
     let instantaneousMaxIdx = 0;
     smoothedProbs.forEach((p, idx) => {
@@ -271,12 +261,10 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
       }
     });
 
-    // Validación clínica cruzada: Si PERCLOS >= 25% sostenido, priorizar estado de fatiga/somnolencia
     if (currentPerclos >= 25 && instantaneousMaxIdx === 0 && smoothedProbs[3] > 0.20) {
-      instantaneousMaxIdx = 3; // FATIGA OCULAR / SUEÑO
+      instantaneousMaxIdx = 3; // EYE FATIGUE / DROWSINESS
     }
 
-    // Aplicar filtro de histéresis temporal
     if (instantaneousMaxIdx !== candidateClassIdx) {
       candidateClassIdx = instantaneousMaxIdx;
       candidateStartTime = now;
@@ -285,10 +273,8 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
     }
 
     const maxIdx = sustainedClassIdx;
-    const classNames = loadedMetadata.classNames || DEFAULT_CLASS_NAMES;
-    const currentClass = classNames[maxIdx] || 'ENFOQUE';
+    const currentClass = DEFAULT_CLASS_NAMES[maxIdx] || 'FOCUS';
 
-    // 5. Esperanza Matemática y Factor de Co-ocurrencia Clínica (kappa)
     const pNormal = smoothedProbs[0] || 0;
     const pFlow = smoothedProbs[1] || 0;
     const pDistr = smoothedProbs[2] || 0;
@@ -296,7 +282,6 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
     const pSobre = smoothedProbs[4] || 0;
     const pAgobio = smoothedProbs[5] || 0;
 
-    // Barra de Enfoque C.L.A.P. Continuo (0-100)
     let focusScore = Math.max(5, Math.min(100, Math.round(
       pNormal * 85 +
       pFlow * 100 +
@@ -306,7 +291,6 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
       pAgobio * 15
     )));
 
-    // Factor de co-ocurrencia (kappa): evita falsos positivos por estiramientos aislados
     const physicalStressScores = [pFatiga, pSobre, pAgobio];
     const maxPhysicalStress = Math.max(...physicalStressScores);
     const secondaryStressSum = (pFatiga + pSobre + pAgobio) - maxPhysicalStress;
@@ -322,7 +306,6 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
       (pFatiga * 55 + pSobre * 80 + pAgobio * 90) * kappa
     );
 
-    // Aplicar atenuación de calentamiento basal (primeros 20 min)
     if (isWarmUpActive()) {
       focusScore = Math.min(100, Math.round(focusScore * 1.05));
       rawStress = rawStress * 0.80;
@@ -330,50 +313,49 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
 
     const stressLevel = Math.max(0, Math.min(100, Math.round(rawStress)));
 
-    // 5. Mapeo Contextual para FocusBud (6 Clases)
-    let statusMessage = "ESTUDIO BASAL / LECTURA TRANQUILA";
+    let statusMessage = "BASELINE STUDY / CALM READING";
     let badgeColor = "text-emerald-400";
     let badgeBg = "bg-emerald-500/10";
     let badgeBorder = "border-emerald-500/30";
 
     switch (maxIdx) {
-      case 0: // ESTUDIO NORMAL / NEUTRO
-        statusMessage = "ESTUDIO BASAL / LECTURA TRANQUILA";
+      case 0:
+        statusMessage = "BASELINE STUDY / CALM READING";
         badgeColor = "text-emerald-400";
         badgeBg = "bg-emerald-500/10";
         badgeBorder = "border-emerald-500/30";
         break;
 
-      case 1: // ENFOQUE PROFUNDO (FLOW)
-        statusMessage = "EN ESTADO DE FLUJO (FIJACIÓN ACTIVA)";
+      case 1:
+        statusMessage = "IN FLOW STATE (ACTIVE FIXATION)";
         badgeColor = "text-sky-400";
         badgeBg = "bg-sky-500/10";
         badgeBorder = "border-sky-500/30";
         break;
 
-      case 2: // DISTRACCIÓN COGNITIVA
-        statusMessage = "DISTRACCIÓN DETECTADA (MIRADA FUERA DE FOCO)";
+      case 2:
+        statusMessage = "DISTRACTION DETECTED (GAZE OFF-TARGET)";
         badgeColor = "text-amber-400";
         badgeBg = "bg-amber-500/10";
         badgeBorder = "border-amber-500/30";
         break;
 
-      case 3: // FATIGA OCULAR / SUEÑO
-        statusMessage = "FATIGA COGNITIVA (PARPADEOS LENTOS / SOMNOLENCIA)";
+      case 3:
+        statusMessage = "COGNITIVE FATIGUE (SLOW BLINKS / DROWSINESS)";
         badgeColor = "text-blue-400";
         badgeBg = "bg-blue-500/10";
         badgeBorder = "border-blue-500/30";
         break;
 
-      case 4: // SOBREESTIMULACIÓN
-        statusMessage = "SOBREESTIMULACIÓN / INQUIETUD MOTORA ELEVADA";
+      case 4:
+        statusMessage = "OVERSTIMULATION / ELEVATED MOTOR RESTLESSNESS";
         badgeColor = "text-rose-400";
         badgeBg = "bg-rose-500/10";
         badgeBorder = "border-rose-500/30";
         break;
 
-      case 5: // AGOBIO POSTURAL
-        statusMessage = "ESTRÉS / AGOBIO POSTURAL (COLAPSO O TENSIÓN FÍSICA)";
+      case 5:
+        statusMessage = "POSTURAL STRAIN (SLOUCHING OR PHYSICAL TENSION)";
         badgeColor = "text-purple-400";
         badgeBg = "bg-purple-500/10";
         badgeBorder = "border-purple-500/30";
@@ -394,16 +376,16 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
       badgeBorder
     };
   } catch (err) {
-    console.error("Error en inferencia de IA:", err);
+    console.error("AI Inference error:", err);
     return {
       classIndex: 0,
-      className: 'ESTUDIO NORMAL / NEUTRO',
+      className: 'NORMAL STUDY / NEUTRAL',
       confidence: 0.85,
       probabilities: [0.85, 0.05, 0.03, 0.03, 0.02, 0.02],
       focusScore: 85,
       stressLevel: 15,
       perclos: 0,
-      statusMessage: 'EN ESTADO DE FLUJO (FIJACIÓN ACTIVA)',
+      statusMessage: 'IN FLOW STATE (ACTIVE FIXATION)',
       badgeColor: 'text-emerald-400',
       badgeBg: 'bg-emerald-500/10',
       badgeBorder: 'border-emerald-500/30'

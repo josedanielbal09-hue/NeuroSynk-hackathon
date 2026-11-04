@@ -15,11 +15,11 @@ export interface StateAvatarConfig {
 export const AVATAR_CONFIG: Record<FocusState, StateAvatarConfig> = {
   ENFOQUE: {
     messages: [
-      "Estamos avanzando juntos a buen ritmo.",
-      "Mantenemos el foco en este micro-paso.",
-      "Aquí sigo contigo. Seguimos concentrados.",
-      "Buen ritmo. Un paso a la vez.",
-      "Estamos en la zona. Continuamos.",
+      "We are moving forward together at a steady pace.",
+      "Staying locked in on this micro-step.",
+      "Right here with you. Keeping our focus sharp.",
+      "Great rhythm. One step at a time.",
+      "We are in the zone. Let's keep going.",
     ],
     audioConfig: {
       frequency: 440,
@@ -30,11 +30,11 @@ export const AVATAR_CONFIG: Record<FocusState, StateAvatarConfig> = {
   },
   ALERTA_SUAVE: {
     messages: [
-      "Volvamos poco a poco al objetivo.",
-      "Sin prisa: retomemos donde nos quedamos.",
-      "Reconectemos con el micro-paso activo.",
-      "Tomemos aire y regresemos al flujo.",
-      "Aquí estamos. Volvamos a la pantalla.",
+      "Let's ease back toward our goal.",
+      "No rush: let's pick up right where we left off.",
+      "Reconnecting with the active micro-step.",
+      "Take a breath and return to your flow.",
+      "Right here with you. Eyes back on the goal.",
     ],
     audioConfig: {
       frequency: 528,
@@ -45,11 +45,11 @@ export const AVATAR_CONFIG: Record<FocusState, StateAvatarConfig> = {
   },
   FATIGA: {
     messages: [
-      "Siento el cansancio. Respiremos un momento.",
-      "Parpadear e hidratarse también es avanzar.",
-      "Bajemos la velocidad unos segundos.",
-      "Cuidemos la energía. Vamos a nuestro ritmo.",
-      "Tomemos un respiro rápido para recuperar.",
+      "Sensing fatigue. Let's take a gentle breath.",
+      "Blinking and hydrating is progress too.",
+      "Let's ease the pace for a few seconds.",
+      "Protecting your energy. Moving at our own rhythm.",
+      "Quick breather to recharge clarity.",
     ],
     audioConfig: {
       frequency: 330,
@@ -60,11 +60,11 @@ export const AVATAR_CONFIG: Record<FocusState, StateAvatarConfig> = {
   },
   PARALISIS: {
     messages: [
-      "No hay prisa. Solo hagamos el primer clic.",
-      "Simplifiquemos: enfoquémonos en una sola acción.",
-      "Estamos aquí. Avancemos sin presión.",
-      "Rompamos la inercia con un paso mínimo.",
-      "Cero presión. Avanzamos cuando estés listo.",
+      "No rush at all. Just make the first click.",
+      "Let's simplify: focus on a single tiny action.",
+      "Right here with you. Moving forward with zero pressure.",
+      "Break inertia with the smallest possible step.",
+      "Zero pressure. We advance whenever you are ready.",
     ],
     audioConfig: {
       frequency: 261.63,
@@ -75,11 +75,11 @@ export const AVATAR_CONFIG: Record<FocusState, StateAvatarConfig> = {
   },
   CELEBRACION: {
     messages: [
-      "¡Buen trabajo! Sigamos con el siguiente paso.",
-      "¡Un paso menos! Sentimos ese avance.",
-      "¡Logrado! Estamos avanzando con firmeza.",
-      "¡Muy bien! Seguimos sumando victorias.",
-      "¡Paso completado! Vamos por el que sigue.",
+      "Great job! Onward to the next step.",
+      "One step down! Feel that momentum.",
+      "Nailed it! Moving forward with confidence.",
+      "Awesome work! Stacking up wins.",
+      "Step complete! Let's tackle the next one.",
     ],
     audioConfig: {
       frequency: 523.25,
@@ -90,10 +90,10 @@ export const AVATAR_CONFIG: Record<FocusState, StateAvatarConfig> = {
   },
   PAUSA: {
     messages: [
-      "Nos tomamos una pausa bien merecida.",
-      "Desconectemos unos minutos para recargar.",
-      "Momento de estirarnos y descansar la vista.",
-      "Pausa activa: cuidamos nuestra mente.",
+      "Taking a well-deserved break.",
+      "Unplugging for a few minutes to recharge.",
+      "Time to stretch and rest your eyes.",
+      "Active break: taking care of your mind.",
     ],
     audioConfig: {
       frequency: 392,
@@ -105,7 +105,7 @@ export const AVATAR_CONFIG: Record<FocusState, StateAvatarConfig> = {
 };
 
 /**
- * Retorna una frase aleatoria en tono de compañero TDAH (Body Doubling) para el estado actual.
+ * Returns a random Body Doubling companion phrase in English for the current state.
  */
 export const getRandomStateMessage = (state: FocusState): string => {
   const messages = AVATAR_CONFIG[state]?.messages;

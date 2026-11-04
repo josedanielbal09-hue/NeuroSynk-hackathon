@@ -19,9 +19,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'supernova',
     kaomoji: '(๑˃̵ᴗ˂̵)و ✨',
-    title: '¡ESTELAR!',
-    badge: '+100 CLAP • IMPACTO CRÍTICO',
-    subtitle: '¡Enfoque en nivel legendario!',
+    title: 'STELLAR!',
+    badge: '+100 CLAP • CRITICAL HIT',
+    subtitle: 'Legendary-tier focus unlocked!',
     primaryColor: '#34d399', // Emerald
     accentColor: '#fbbf24',  // Amber gold
     glowColor: 'rgba(52, 211, 153, 0.55)',
@@ -31,9 +31,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'fuego_shonen',
     kaomoji: '🔥 (ง\'̀-\'́)ง 🔥',
-    title: '¡FUEGO KAIZEN!',
-    badge: 'RACHA ARDIENTE • MOMENTUM S+',
-    subtitle: '¡Tu persistencia rompió la inercia!',
+    title: 'KAIZEN FIRE!',
+    badge: 'BLAZING STREAK • MOMENTUM S+',
+    subtitle: 'Your persistence shattered inertia!',
     primaryColor: '#f97316', // Orange
     accentColor: '#ef4444',  // Red
     glowColor: 'rgba(249, 115, 22, 0.55)',
@@ -44,8 +44,8 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
     id: 'sakura_flow',
     kaomoji: '🌸 (◕‿◕✿) 🌸',
     title: 'SAKURA FLOW',
-    badge: '+100 CLAP • ESTADO DE FLUJO',
-    subtitle: 'Mente despejada, serenidad y avance',
+    badge: '+100 CLAP • FLOW STATE',
+    subtitle: 'Clear mind, calm serenity, steady progress',
     primaryColor: '#f472b6', // Pink
     accentColor: '#38bdf8',  // Sky blue
     glowColor: 'rgba(244, 114, 182, 0.55)',
@@ -55,9 +55,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'cyber_boost',
     kaomoji: '⚡️ ٩(ˊᗜˋ*)و ⚡️',
-    title: 'HIPER-SINAPSIS',
-    badge: 'RANGO S+ • SINAPSIS RÁPIDA',
-    subtitle: 'Sincronía biométrica perfecta',
+    title: 'HYPER-SYNAPSE',
+    badge: 'RANK S+ • RAPID SYNAPSE',
+    subtitle: 'Flawless biometric synchronization',
     primaryColor: '#06b6d4', // Cyan
     accentColor: '#10b981',  // Emerald
     glowColor: 'rgba(6, 182, 212, 0.55)',
@@ -67,9 +67,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'sugar_dopamine',
     kaomoji: '🍬 (*＾▽＾)／ 🍬',
-    title: 'DULCE VICTORIA',
-    badge: '+100 CLAP • DOPAMINA PURA',
-    subtitle: '¡Un paso menos, el objetivo está cerca!',
+    title: 'SWEET VICTORY',
+    badge: '+100 CLAP • PURE DOPAMINE',
+    subtitle: 'One step down, the finish line is closer!',
     primaryColor: '#c084fc', // Purple
     accentColor: '#f472b6',  // Pink
     glowColor: 'rgba(192, 132, 252, 0.55)',
@@ -79,9 +79,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'apex_victory',
     kaomoji: '👑 ＼(＾▽＾)／ 👑',
-    title: '¡DOMINIO TOTAL!',
-    badge: 'LOGRO DESBLOQUEADO • CLAP MAX',
-    subtitle: '¡Paso completado con maestría!',
+    title: 'TOTAL MASTERY!',
+    badge: 'ACHIEVEMENT UNLOCKED • MAX CLAP',
+    subtitle: 'Step completed with absolute mastery!',
     primaryColor: '#eab308', // Gold
     accentColor: '#14b8a6',  // Teal
     glowColor: 'rgba(234, 179, 8, 0.55)',
@@ -91,9 +91,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'star_eyes',
     kaomoji: '✨ (★ω★) ✧',
-    title: 'VISIÓN CÓSMICA',
-    badge: 'RANGO EX • BRILLO ABSOLUTO',
-    subtitle: '¡Claridad mental y ejecución impecable!',
+    title: 'COSMIC VISION',
+    badge: 'RANK EX • RADIANT CLARITY',
+    subtitle: 'Mental sharpness and spotless execution!',
     primaryColor: '#facc15', // Yellow
     accentColor: '#ec4899',  // Hot pink
     glowColor: 'rgba(250, 204, 21, 0.55)',
@@ -103,9 +103,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'body_doubling_hug',
     kaomoji: '💖 (づ｡◕‿‿◕｡)づ 💕',
-    title: 'CONEXIÓN TOTAL',
-    badge: '+100 CLAP • ENERGÍA VITAL',
-    subtitle: 'FocusBud y tú en sincronía imparable',
+    title: 'FULL SYNERGY',
+    badge: '+100 CLAP • VITAL ENERGY',
+    subtitle: 'You and FocusBud in unstoppable sync',
     primaryColor: '#fb7185', // Rose
     accentColor: '#a855f7',  // Purple
     glowColor: 'rgba(251, 113, 133, 0.55)',
@@ -115,9 +115,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'ultra_shonen',
     kaomoji: '💥 ᕙ(⇀‸↼‶)ᕗ 💥',
-    title: '¡PLUS ULTRA!',
-    badge: 'SUPERACIÓN TOTAL • SIN LÍMITES',
-    subtitle: '¡Demostraste de lo que eres capaz!',
+    title: 'PLUS ULTRA!',
+    badge: 'BREAKTHROUGH • LIMITLESS',
+    subtitle: 'You just proved what you are capable of!',
     primaryColor: '#ef4444', // Red
     accentColor: '#f59e0b',  // Amber
     glowColor: 'rgba(239, 68, 68, 0.55)',
@@ -127,9 +127,9 @@ export const REWARD_ARCHETYPES: RewardArchetype[] = [
   {
     id: 'zen_harmony',
     kaomoji: '🍃 (✿◠‿◠) 🍵',
-    title: 'ARMONÍA ZEN',
-    badge: 'SERENIDAD PURA • FOCO 100%',
-    subtitle: 'Avanzando en paz, sin fricción',
+    title: 'ZEN HARMONY',
+    badge: 'PURE SERENITY • 100% FOCUS',
+    subtitle: 'Moving forward peacefully, zero friction',
     primaryColor: '#10b981', // Emerald
     accentColor: '#6ee7b7',  // Light mint
     glowColor: 'rgba(16, 185, 129, 0.55)',
@@ -163,7 +163,6 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = R
     return REWARD_ARCHETYPES[idx];
   }, [archetypeIndex]);
 
-  // Generar 10 partículas orbitales precalculadas (CERO filtros pesados, 100% transform hardware a 60 FPS)
   const particles: ParticleData[] = useMemo(() => {
     return Array.from({ length: 10 }).map((_, i) => {
       const angle = (i * 360) / 10 + (Math.sin(i * 1.7) * 8);
@@ -242,7 +241,7 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = R
           transition={{ duration: 0.12 }}
           className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none select-none overflow-hidden"
         >
-          {/* 1. Anillo de Onda de Choque Anime (Shockwave Ring - Acelerado por GPU) */}
+          {/* 1. GPU-Accelerated Shockwave Ring */}
           <motion.div
             initial={{ scale: 0.35, opacity: 0.9 }}
             animate={{ scale: 2.2, opacity: 0 }}
@@ -255,7 +254,7 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = R
             }}
           />
 
-          {/* 2. Ráfaga de Partículas Vectoriales Kawaii (Cero filtros CPU, puro translate3d) */}
+          {/* 2. Vector Kawaii Particle Burst */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             {particles.map((p) => {
               const rad = (p.angle * Math.PI) / 180;
@@ -292,7 +291,7 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = R
             })}
           </div>
 
-          {/* 3. Tarjeta de Celebración Kawaii Anime (Pop instantáneo sin backdrop-blur pesado) */}
+          {/* 3. Kawaii Anime Celebration Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.72, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -310,15 +309,15 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = R
               willChange: 'transform, opacity'
             }}
           >
-            {/* Combo Badge Superior */}
+            {/* Top Combo Badge */}
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-700/60">
               {renderIcon(archetype.icon)}
               <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-zinc-300 whitespace-nowrap">
-                PASO SUPERADO • RACHA x{comboCount}
+                STEP CLEARED • STREAK x{comboCount}
               </span>
             </div>
 
-            {/* Kaomoji Masivo Estilo Anime - En una sola línea sin desbordes ni filtros drop-shadow pesados */}
+            {/* Anime Kaomoji & Title */}
             <div className="space-y-1 my-0.5 w-full flex flex-col items-center">
               <span className="text-2xl sm:text-3xl font-black whitespace-nowrap tracking-wide leading-normal block select-none text-white">
                 {archetype.kaomoji}
@@ -335,7 +334,7 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = R
               </h3>
             </div>
 
-            {/* Píldora de Recompensa XP & Dopamina */}
+            {/* XP & Dopamine Reward Pill */}
             <div
               className="px-4 py-1.5 rounded-2xl border font-mono text-xs font-black tracking-wider uppercase flex items-center gap-1.5 shadow-lg"
               style={{
@@ -348,7 +347,7 @@ export const KawaiiRewardCelebration: React.FC<KawaiiRewardCelebrationProps> = R
               <span>{archetype.badge}</span>
             </div>
 
-            {/* Subtítulo Motivacional */}
+            {/* Motivational Subtitle */}
             <p className="text-[11px] font-sans font-medium text-zinc-400 mt-0.5">
               {archetype.subtitle}
             </p>

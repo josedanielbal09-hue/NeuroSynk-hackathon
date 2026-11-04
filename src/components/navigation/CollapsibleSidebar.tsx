@@ -62,14 +62,12 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Recargar historial cada vez que se abre la barra lateral
   useEffect(() => {
     if (isOpen) {
       setSessions(getSessionHistory());
     }
   }, [isOpen]);
 
-  // Escuchar eventos globales de sincronización en tiempo real
   useEffect(() => {
     const handleUpdate = () => {
       setSessions(getSessionHistory());
@@ -92,7 +90,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   };
 
   const handleClearAll = () => {
-    if (window.confirm('¿Deseas vaciar todo el historial de sesiones de esta computadora? Esta acción no se puede deshacer.')) {
+    if (window.confirm('Do you want to clear all saved session history on this computer? This action cannot be undone.')) {
       clearSessionHistory();
       setSessions([]);
       setSelectedSession(null);
@@ -107,9 +105,9 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       const content = event.target?.result as string;
       if (content && importSessionHistory(content)) {
         setSessions(getSessionHistory());
-        alert('¡Historial importado con éxito!');
+        alert('Session history imported successfully!');
       } else {
-        alert('El archivo no tiene un formato JSON válido de NeuroSynk.');
+        alert('Invalid NeuroSynk JSON file format.');
       }
     };
     reader.readAsText(file);
@@ -127,13 +125,13 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
 
   const formatRelativeTime = (ts: number): string => {
     const diffMins = Math.round((Date.now() - ts) / (1000 * 60));
-    if (diffMins < 1) return 'Hace un momento';
-    if (diffMins < 60) return `Hace ${diffMins}m`;
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
     const diffHours = Math.round(diffMins / 60);
-    if (diffHours < 24) return `Hoy hace ${diffHours}h`;
+    if (diffHours < 24) return `Today, ${diffHours}h ago`;
     const days = Math.round(diffHours / 24);
-    if (days === 1) return 'Ayer';
-    return `Hace ${days}d`;
+    if (days === 1) return 'Yesterday';
+    return `${days}d ago`;
   };
 
   return (
@@ -152,11 +150,11 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           type="button"
           onClick={() => setIsOpen(true)}
           className="fixed top-4 left-4 z-40 p-2.5 rounded-2xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 shadow-xl transition-all active:scale-95 flex items-center gap-2 cursor-pointer group"
-          title="Abrir Menú & Historial (Gemini Workspace)"
+          title="Open Menu & History"
         >
           <Menu className="w-4 h-4 text-emerald-400 group-hover:rotate-12 transition-transform" />
           <span className="hidden sm:inline font-mono text-[11px] font-medium text-zinc-400 group-hover:text-zinc-200">
-            Menú
+            Menu
           </span>
           {sessions.length > 0 && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -207,13 +205,13 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               type="button"
               onClick={() => setIsOpen(false)}
               className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer"
-              title="Cerrar barra lateral"
+              title="Close sidebar"
             >
               <PanelLeftClose className="w-4 h-4" />
             </button>
           </div>
 
-          {/* "+ Nueva Sesión" Button */}
+          {/* "+ New Session" Button */}
           <button
             type="button"
             onClick={() => {
@@ -221,12 +219,12 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               setIsOpen(false);
             }}
             className="w-full mt-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-teal-500/15 border border-emerald-500/40 hover:border-emerald-500/80 text-emerald-300 font-medium text-sm flex items-center gap-3 transition-all duration-200 cursor-pointer active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.12)] group"
-            title="Iniciar Nueva Sesión"
+            title="Start New Session"
           >
             <div className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
               <Plus className="w-4 h-4 text-emerald-400" />
             </div>
-            <span className="whitespace-nowrap font-semibold tracking-wide">Nueva Sesión</span>
+            <span className="whitespace-nowrap font-semibold tracking-wide">New Session</span>
           </button>
         </div>
 
@@ -236,7 +234,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           <div className="space-y-1.5">
             <div className="px-2 py-1 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
               <span className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-zinc-400" /> Sesiones Guardadas
+                <Clock className="w-3.5 h-3.5 text-zinc-400" /> Saved Sessions
               </span>
               <span className="text-[10px] text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-800 font-mono">
                 {sessions.length}
@@ -272,10 +270,10 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                           <span>{formatRelativeTime(item.timestamp)}</span>
                           <span>•</span>
                           <span className={isCompleted ? 'text-emerald-400' : 'text-amber-400'}>
-                            {item.completedSteps}/{item.totalSteps} pasos
+                            {item.completedSteps}/{item.totalSteps} steps
                           </span>
                           <span>•</span>
-                          <span className="text-cyan-400 font-medium">{item.avgFocus}% Foco</span>
+                          <span className="text-cyan-400 font-medium">{item.avgFocus}% Focus</span>
                         </div>
                       </div>
                     </div>
@@ -284,7 +282,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                       type="button"
                       onClick={(e) => handleDeleteSession(item.id, e)}
                       className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-all cursor-pointer shrink-0 ml-1"
-                      title="Eliminar de historial"
+                      title="Remove from history"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -294,8 +292,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
 
               {sessions.length === 0 && (
                 <div className="p-4 text-center text-xs text-zinc-500 bg-zinc-900/30 rounded-xl border border-zinc-900/80 space-y-1">
-                  <p className="font-semibold text-zinc-400">Sin sesiones grabadas aún</p>
-                  <p className="text-[11px] text-zinc-600">Cada sesión que inicies se guardará automáticamente en tu computadora.</p>
+                  <p className="font-semibold text-zinc-400">No recorded sessions yet</p>
+                  <p className="text-[11px] text-zinc-600">Every session you start will be saved automatically on your computer.</p>
                 </div>
               )}
             </div>
@@ -304,7 +302,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           {/* Tools Hub */}
           <div className="space-y-1.5 pt-3 border-t border-zinc-900">
             <div className="px-2 py-1 text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold">
-              Herramientas & Datos
+              Tools & Data
             </div>
 
             <button
@@ -315,7 +313,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
                 <BookOpen className="w-3.5 h-3.5 text-purple-400" />
               </div>
-              <span className="whitespace-nowrap">Cuaderno de Notas</span>
+              <span className="whitespace-nowrap">Quick Notebook</span>
             </button>
 
             <button
@@ -329,7 +327,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
                 <Settings className="w-3.5 h-3.5 text-cyan-400" />
               </div>
-              <span className="whitespace-nowrap">Ajustes & Enlace IA</span>
+              <span className="whitespace-nowrap">Settings & AI Link</span>
             </button>
 
             <button
@@ -337,24 +335,24 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               onClick={exportSessionHistory}
               disabled={sessions.length === 0}
               className="w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900/90 disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer border border-transparent hover:border-zinc-800"
-              title="Descargar copia de seguridad en JSON"
+              title="Download JSON backup"
             >
               <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
                 <Download className="w-3.5 h-3.5 text-emerald-400" />
               </div>
-              <span className="whitespace-nowrap">Exportar Registros (JSON)</span>
+              <span className="whitespace-nowrap">Export Records (JSON)</span>
             </button>
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-900/90 transition-colors cursor-pointer border border-transparent hover:border-zinc-800"
-              title="Restaurar registros desde archivo JSON"
+              title="Restore records from JSON file"
             >
               <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
                 <Upload className="w-3.5 h-3.5 text-blue-400" />
               </div>
-              <span className="whitespace-nowrap">Importar Registros</span>
+              <span className="whitespace-nowrap">Import Records</span>
             </button>
 
             {sessions.length > 0 && (
@@ -366,7 +364,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 <div className="w-7 h-7 rounded-lg bg-zinc-900 flex items-center justify-center shrink-0 text-zinc-500">
                   <Trash2 className="w-3.5 h-3.5" />
                 </div>
-                <span>Limpiar Historial Local</span>
+                <span>Clear Local History</span>
               </button>
             )}
           </div>
@@ -382,7 +380,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   : 'bg-red-500'
               }`} />
               <span className="truncate whitespace-nowrap font-medium">
-                {apiStatus === 'server' ? 'Meta Muse • Live' : (apiStatus === 'browser' ? 'Meta Web' : 'IA Offline')}
+                {apiStatus === 'server' ? 'Meta Muse • Live' : (apiStatus === 'browser' ? 'Meta Web' : 'AI Offline')}
               </span>
             </div>
             <span className="text-[9px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 font-semibold uppercase">
@@ -396,10 +394,10 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               <span className="text-xs font-semibold text-zinc-200 truncate whitespace-nowrap">
-                Usuario Focus
+                Focus User
               </span>
               <span className="text-[10px] text-zinc-500 font-mono truncate whitespace-nowrap">
-                Base Local Privada
+                Private Local Storage
               </span>
             </div>
           </div>
@@ -427,7 +425,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     <Activity className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-white font-semibold text-sm">Resumen de Sesión</h3>
+                    <h3 className="text-white font-semibold text-sm">Session Summary</h3>
                     <p className="text-[11px] font-mono text-zinc-500">
                       {new Date(selectedSession.timestamp).toLocaleDateString()} • {new Date(selectedSession.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
@@ -443,23 +441,23 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               </div>
 
               <div>
-                <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Objetivo:</span>
+                <span className="text-xs font-mono uppercase text-zinc-400 tracking-wider">Goal:</span>
                 <p className="text-sm font-semibold text-white mt-1">"{selectedSession.task}"</p>
               </div>
 
               <div className="grid grid-cols-3 gap-2.5 py-1">
                 <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 flex flex-col items-center justify-center text-center">
-                  <span className="text-xs font-mono text-zinc-400">Duración</span>
+                  <span className="text-xs font-mono text-zinc-400">Duration</span>
                   <span className="text-base font-bold text-white mt-0.5">{selectedSession.durationMinutes}m</span>
                 </div>
                 <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 flex flex-col items-center justify-center text-center">
-                  <span className="text-xs font-mono text-zinc-400">Pasos</span>
+                  <span className="text-xs font-mono text-zinc-400">Steps</span>
                   <span className="text-base font-bold text-emerald-400 mt-0.5">
                     {selectedSession.completedSteps}/{selectedSession.totalSteps}
                   </span>
                 </div>
                 <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 flex flex-col items-center justify-center text-center">
-                  <span className="text-xs font-mono text-zinc-400">Enfoque</span>
+                  <span className="text-xs font-mono text-zinc-400">Focus</span>
                   <span className="text-base font-bold text-cyan-400 mt-0.5">{selectedSession.avgFocus}%</span>
                 </div>
               </div>
@@ -467,7 +465,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               {selectedSession.debriefSummary && (
                 <div className="p-3.5 bg-zinc-950/80 rounded-2xl border border-zinc-800/80">
                   <span className="text-[10px] font-mono uppercase tracking-wider text-purple-400 font-semibold block mb-1">
-                    Debriefing Cognitivo IA:
+                    AI Cognitive Debrief:
                   </span>
                   <p className="text-xs text-zinc-300 leading-relaxed font-sans">
                     {selectedSession.debriefSummary}
@@ -485,14 +483,14 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   }}
                   className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs rounded-xl transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" /> Reanudar / Repetir
+                  <RotateCcw className="w-3.5 h-3.5" /> Resume / Repeat
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedSession(null)}
                   className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium text-xs rounded-xl transition-colors cursor-pointer"
                 >
-                  Cerrar
+                  Close
                 </button>
               </div>
             </motion.div>
@@ -518,7 +516,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
                 <div className="flex items-center gap-2.5">
                   <BookOpen className="w-4 h-4 text-purple-400" />
-                  <h3 className="text-white font-semibold text-sm">Cuaderno Cognitivo Rápido</h3>
+                  <h3 className="text-white font-semibold text-sm">Quick Cognitive Notebook</h3>
                 </div>
                 <button
                   type="button"
@@ -532,18 +530,18 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
               <textarea
                 value={quickNote}
                 onChange={e => handleSaveNote(e.target.value)}
-                placeholder="Apunta ideas repentinas, dudas o reflexiones para no romper tu estado de flujo..."
+                placeholder="Jot down sudden ideas, questions, or thoughts without breaking your flow state..."
                 className="w-full h-44 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-purple-500/50 resize-none leading-relaxed"
               />
 
               <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500">
-                <span>Guardado automático en tu navegador</span>
+                <span>Auto-saved in your browser</span>
                 <button
                   type="button"
                   onClick={() => setShowNotesModal(false)}
                   className="px-4 py-2 bg-purple-500 hover:bg-purple-400 text-zinc-950 font-bold text-xs rounded-xl transition-all cursor-pointer"
                 >
-                  Listo
+                  Done
                 </button>
               </div>
             </motion.div>

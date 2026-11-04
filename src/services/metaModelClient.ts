@@ -1,12 +1,12 @@
 /**
  * NeuroSynk AI Core - Meta Model Integration Client
- * Preparado para Meta Global AI Developer Hackathon (Startup Track)
- * 
- * Modelos integrados:
- * 1. Muse Spark / Muse Spark Open (Streaming de baja latencia para intervenciones en tiempo real)
- * 2. Muse Wonder (Motor de razonamiento para descomposición cognitiva de tareas complejas)
- * 3. SAM 3.1 (Segment Anything para análisis y calibración ergonómica del espacio de trabajo)
- * 4. Baseten / Modal (Inferencia resiliente de modelos abiertos)
+ * Prepared for Meta Global AI Developer Hackathon (Startup Track)
+ *
+ * Integrated models:
+ * 1. Muse Spark / Muse Spark Open (Low-latency streaming for real-time interventions)
+ * 2. Muse Wonder (Reasoning engine for cognitive breakdown of complex tasks)
+ * 3. SAM 3.1 (Segment Anything for workspace ergonomic analysis and calibration)
+ * 4. Baseten / Modal (Resilient open-model inference)
  */
 
 export interface MetaSparkPayload {
@@ -76,17 +76,16 @@ export async function testMetaModelConnection(apiKey?: string): Promise<{ succes
         else if (data.activeProvider === 'gemini') name = 'Google Gemini';
         return {
           success: true,
-          message: `Conectado a ${name}`
+          message: `Connected to ${name}`
         };
       }
     }
-    return { success: true, message: 'Motor de inferencia local activo' };
+    return { success: true, message: 'Local inference engine active' };
   } catch (err: any) {
-    return { success: false, message: err?.message || 'Error de conexión' };
+    return { success: false, message: err?.message || 'Connection error' };
   }
 }
 
-// Alias de retrocompatibilidad
 export const testGeminiConnection = testMetaModelConnection;
 
 function getClientApiKey(explicitKey?: string): string {
@@ -127,12 +126,12 @@ export async function chatUniversal(
     });
     if (response.ok) {
       const data = await response.json();
-      return { reply: data.reply || "AVANZA con el primer paso. Estamos contigo." };
+      return { reply: data.reply || "PROCEED with the first step. We are right here with you." };
     }
   } catch (err) {
     console.warn('[Meta Client Chat] Fallback:', err);
   }
-  return { reply: "AVANZA con determinación en este paso. Seguimos contigo." };
+  return { reply: "MOVE forward with determination on this step. Still here with you." };
 }
 
 export async function sessionDebriefUniversal(
@@ -159,7 +158,7 @@ export async function sessionDebriefUniversal(
     console.warn('[Session Debrief Client] Fallback:', err);
   }
   return {
-    debrief: `SESIÓN CONCLUIDA: Has completado ${payload.completedStepsCount} de ${payload.totalStepsCount} pasos en "${payload.task}". Tu promedio de enfoque se mantuvo en ${payload.averageFocus}%. Excelente persistencia. Toma 5 minutos para estirarte y descansar la vista antes de tu siguiente bloque.`
+    debrief: `SESSION COMPLETED: You finished ${payload.completedStepsCount} of ${payload.totalStepsCount} steps on "${payload.task}". Your average focus stayed at ${payload.averageFocus}%. Outstanding persistence. Take 5 minutes to stretch and rest your eyes before your next block.`
   };
 }
 
@@ -190,28 +189,28 @@ export async function taskSurveyUniversal(
     questions: [
       {
         id: "q1",
-        question: "¿Cuánto tiempo dedicarás a esta sesión?",
-        options: ["25 a 30 minutos (Sprint corto)", "45 a 60 minutos (Sesión estándar)", "90 a 120 minutos (Sesión profunda)"]
+        question: "How much time will you dedicate to this session?",
+        options: ["25 to 30 minutes (Short sprint)", "45 to 60 minutes (Standard session)", "90 to 120 minutes (Deep session)"]
       },
       {
         id: "q2",
-        question: "¿Qué avance tangible buscas lograr al concluir este tiempo?",
-        options: ["Comprender la idea central", "Resolver un ejercicio o sección", "Completar una entrega formal"]
+        question: "What tangible outcome do you want to achieve by the end?",
+        options: ["Grasp the core concept", "Solve an exercise or section", "Complete a formal deliverable"]
       },
       {
         id: "q3",
-        question: "¿Cuál es tu nivel de familiaridad o preparación con los materiales?",
-        options: ["Parto desde cero absoluto", "Tengo bases y notas listas", "Domino el tema, voy a producir"]
+        question: "How familiar or prepared are you with the materials?",
+        options: ["Starting from scratch", "Have basics and notes ready", "Mastered the topic, ready to produce"]
       },
       {
         id: "q4",
-        question: "¿Cómo describirías tu nivel de energía y foco en este momento?",
-        options: ["Alta energía y foco despejado", "Energía media / neutra", "Mente dispersa o fatiga inicial"]
+        question: "How would you describe your energy and focus right now?",
+        options: ["High energy and clear focus", "Medium / neutral energy", "Scattered mind or initial fatigue"]
       },
       {
         id: "q5",
-        question: "¿En qué momento sueles experimentar mayor fricción o bloqueo?",
-        options: ["Al romper la inercia del inicio", "A la mitad con la densidad técnica", "Al cerrar y pulir detalles finales"]
+        question: "When do you usually experience the most friction or mental block?",
+        options: ["Breaking initial inertia", "Midway through dense technical parts", "Wrapping up and polishing final details"]
       }
     ]
   };
@@ -258,12 +257,12 @@ export async function splitTaskUniversal(
 
   return {
     steps: [
-      `DELIMITA el objetivo específico y materiales necesarios para este bloque de '${task}'.`,
-      `ANALIZA el primer núcleo conceptual identificando definiciones clave.`,
-      `DESARROLLA la primera sección aplicando los métodos centrales.`,
-      `PAUSA SOMÁTICA: Despeja la vista de la pantalla, bebe agua y estira los brazos 3 minutos.`,
-      `EJECUTA la segunda fase de práctica consolidando los conceptos trabajados.`,
-      `VERIFICA los resultados obtenidos y formula un resumen final.`
+      `DEFINE the specific objective and essential materials for this block on '${task}'.`,
+      `ANALYZE the first core concept by identifying key definitions.`,
+      `DEVELOP the first section applying the main methods.`,
+      `SOMATIC PAUSE: Look away from the screen, drink water, and stretch your arms for 3 minutes.`,
+      `EXECUTE the second practice phase consolidating the concepts covered.`,
+      `VERIFY your results and write a brief closing summary.`
     ]
   };
 }
@@ -300,16 +299,16 @@ export async function subdivideStepUniversal(
 
   return {
     subSteps: [
-      "TOMA tu pluma o sitúa el cursor directamente en tu espacio de trabajo.",
-      "LOCALIZA únicamente la primera línea o concepto introductorio.",
-      "ESCRIBE la primera palabra clave para romper la inercia."
+      "GRAB your pen or place the cursor directly in your workspace.",
+      "LOCATE only the very first line or introductory concept.",
+      "WRITE the first keyword to break initial inertia."
     ]
   };
 }
 
 /**
- * Solicita a Meta Muse Spark una celebración verbal humana y específica
- * de la actividad/paso que el usuario acaba de dominar.
+ * Requests a human, specific verbal celebration from Meta Muse Spark
+ * for the micro-step the user just mastered.
  */
 export async function celebrateStepUniversal(
   completedStep: string,
@@ -318,13 +317,13 @@ export async function celebrateStepUniversal(
 ): Promise<string> {
   const getDynamicFallback = (step: string): string => {
     const clean = step.replace(/^(\d+\.?\s*|[-•*]\s*)/, '').trim();
-    const match = clean.match(/^([A-ZÁÉÍÓÚÑ]{3,})\s+(.*)/i);
+    const match = clean.match(/^([A-Z]{3,})\s+(.*)/i);
     if (match) {
       const verb = match[1].toLowerCase();
       const rest = match[2].slice(0, 42).replace(/[.,;:].*$/, '').trim();
-      return `¡Gran trabajo al ${verb} ${rest}! Mantén ese impulso.`;
+      return `Great work as you ${verb} ${rest}! Keep that momentum going.`;
     }
-    return `¡Paso superado con éxito! Seguimos con el siguiente objetivo.`;
+    return `Step conquered! Moving right on to the next goal.`;
   };
 
   try {
@@ -352,7 +351,7 @@ export async function celebrateStepUniversal(
 }
 
 /**
- * Solicita una micro-intervención verbal en streaming a Muse Spark
+ * Requests a streaming verbal micro-intervention from Muse Spark
  */
 export async function streamMuseSparkIntervention(
   payload: MetaSparkPayload,
@@ -367,7 +366,7 @@ export async function streamMuseSparkIntervention(
     });
 
     if (!response.ok || !response.body) {
-      throw new Error(`Error en enlace con Muse Spark (${response.status})`);
+      throw new Error(`Muse Spark link error (${response.status})`);
     }
 
     const reader = response.body.getReader();
@@ -382,12 +381,12 @@ export async function streamMuseSparkIntervention(
 
     if (onComplete) onComplete();
   } catch (error) {
-    console.warn('[Muse Spark Client] Fallback local:', error);
-    let fallback = 'MANTÉN el ritmo. Respira profundo 3 segundos y continúa enfocado.';
+    console.warn('[Muse Spark Client] Local fallback:', error);
+    let fallback = 'KEEP the rhythm. Breathe deeply for 3 seconds and stay focused.';
     if (payload.perclos > 25 || payload.fatigueScore > 50) {
-      fallback = 'DESCANSA la mirada 20 segundos fuera de la pantalla. Cuidamos tu energía.';
+      fallback = 'REST your gaze away from the screen for 20 seconds. Protecting your energy.';
     } else if (payload.postureScore > 40) {
-      fallback = 'ALINEA tus hombros y eleva el mentón. Tu postura potencia tu claridad.';
+      fallback = 'ALIGN your shoulders and lift your chin. Good posture sharpens clarity.';
     }
     onChunk(fallback);
     if (onComplete) onComplete();
@@ -395,7 +394,7 @@ export async function streamMuseSparkIntervention(
 }
 
 /**
- * Descompone una tarea cognitiva compleja en 3 nano-pasos ejecutables usando Muse Wonder
+ * Decomposes a complex cognitive task into 3 executable nano-steps using Muse Wonder
  */
 export async function decomposeWithMuseWonder(
   payload: MetaWonderDecomposePayload
@@ -422,17 +421,17 @@ export async function decomposeWithMuseWonder(
 
   return {
     nanoSteps: [
-      `DELIMITA la primera palabra clave o concepto inicial de "${payload.task}".`,
-      'ABRE el documento o cuaderno y escribe una sola frase introductoria.',
-      'AVANZA con el primer párrafo sin juzgar la perfección; mantendremos el flujo.'
+      `DEFINE the first keyword or initial concept of "${payload.task}".`,
+      'OPEN your document or notebook and write a single introductory sentence.',
+      'PROCEED with the first paragraph without judging perfection; we will maintain flow.'
     ],
     estimatedSecondsPerStep: 45
   };
 }
 
 /**
- * Calibración ergonómica determinista local (Edge Privacy)
- * NUNCA envía video ni imágenes del usuario fuera del dispositivo.
+ * Deterministic local ergonomic calibration (Edge Privacy)
+ * NEVER sends user video or images off the device.
  */
 export async function calibrateErgonomicsWithSAM(
   telemetryOrSnapshot?: string | { rollAngle?: number; shoulderAngle?: number; pitchAngle?: number; stressLevel?: number }
@@ -461,14 +460,14 @@ export async function calibrateErgonomicsWithSAM(
     shoulderAlignmentScore: 92,
     clutterScore: 15,
     recommendations: [
-      'Distancia pantalla-rostro dentro del rango ergonómico óptimo (50-70 cm).',
-      'Hombros alineados horizontalmente. Espacio despejado para máxima atención.'
+      'Screen-to-face distance within optimal ergonomic range (50-70 cm).',
+      'Shoulders horizontally aligned. Workspace clear for peak attention.'
     ]
   };
 }
 
 /**
- * Obtiene la metadata del modelo de Red Neuronal Biométrico entrenado
+ * Fetches trained Biometric Neural Network model metadata
  */
 export async function getModelInfo(): Promise<any> {
   try {
@@ -481,5 +480,3 @@ export async function getModelInfo(): Promise<any> {
   }
   return null;
 }
-
-
