@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "terminal:biometrics": "tsx scripts/monitor-biometrics.ts",
+    "terminal:muse": "tsx scripts/monitor-muse.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

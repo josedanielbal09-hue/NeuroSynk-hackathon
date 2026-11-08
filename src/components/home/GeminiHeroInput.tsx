@@ -179,7 +179,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="text-sm sm:text-base text-zinc-400 max-w-lg mb-8 font-normal leading-relaxed"
         >
-          Enter your study or work goal. FocusBud and Meta Muse will break your session into guided blocks with live biometrics.
+          Enter your study or work goal. FocusBud and Google Gemini will break your session into guided blocks with live biometrics.
         </motion.p>
 
         {/* Main Capsule Input Form */}
@@ -279,7 +279,7 @@ export const GeminiHeroInput: React.FC<GeminiHeroInputProps> = ({
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Meta Muse Spark Live
+            Google Gemini 3.5 / 2.5 / 2.0 Flash
           </span>
         </div>
       </footer>

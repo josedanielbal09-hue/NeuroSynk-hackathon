@@ -252,16 +252,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     onClick={() => setSelectedSession(item)}
                     className={`group relative flex items-center justify-between p-3 rounded-xl transition-all cursor-pointer border ${
                       isSelected
-                        ? 'bg-zinc-900 border-emerald-500/50 text-emerald-300 shadow-md'
-                        : 'bg-zinc-950/70 hover:bg-zinc-900/90 border-zinc-900 hover:border-zinc-800 text-zinc-300'
-                    }`}
+                      ? 'bg-zinc-900 border-emerald-500/50 text-emerald-300 shadow-md'
+                      : 'bg-zinc-950/70 hover:bg-zinc-900/90 border-zinc-900 hover:border-zinc-800 text-zinc-300'
+                      }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${
-                        isCompleted
-                          ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]'
-                          : 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.7)]'
-                      }`} />
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${isCompleted
+                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]'
+                        : 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.7)]'
+                        }`} />
                       <div className="flex flex-col min-w-0 flex-1">
                         <span className="text-xs font-medium truncate text-zinc-200 group-hover:text-white">
                           {item.task}
@@ -374,13 +373,12 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         <div className="p-4 border-t border-zinc-900 flex flex-col gap-2.5 bg-zinc-950 shrink-0">
           <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-[10px] font-mono text-zinc-300">
             <div className="flex items-center gap-2 overflow-hidden">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                apiStatus === 'server' || apiStatus === 'browser'
-                  ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.7)]'
-                  : 'bg-red-500'
-              }`} />
+              <span className={`w-2 h-2 rounded-full shrink-0 ${apiStatus === 'server' || apiStatus === 'browser'
+                ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.7)]'
+                : 'bg-red-500'
+                }`} />
               <span className="truncate whitespace-nowrap font-medium">
-                {apiStatus === 'server' ? 'Meta Muse • Live' : (apiStatus === 'browser' ? 'Meta Web' : 'AI Offline')}
+                {apiStatus === 'server' ? 'Google Gemini • Live' : (apiStatus === 'browser' ? 'Google Gemini Web' : 'AI Offline')}
               </span>
             </div>
             <span className="text-[9px] text-zinc-400 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 font-semibold uppercase">

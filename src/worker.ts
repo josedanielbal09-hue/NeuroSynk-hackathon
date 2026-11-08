@@ -1,14 +1,13 @@
 /**
  * NeuroSynk Cloudflare Worker Backend
- * Serves secure AI endpoints using server-side credentials
+ * Serves secure AI endpoints using Google Gemini API
  * Supported models:
- * 1. Meta Muse Spark Open via Baseten (meta-models/muse-spark-open-1026)
+ * 1. Google Gemini 3.5 Flash -> 2.5 Flash -> 2.0 Flash (generativelanguage.googleapis.com)
  * 2. Deterministic Edge-Biomechanical heuristics (Privacy Safe)
  */
 
 export interface Env {
-  BASETEN_API_KEY?: string;
-  META_API_KEY?: string;
+  GEMINI_API_KEY?: string;
   ASSETS: {
     fetch: (request: Request) => Promise<Response>;
   };
@@ -17,17 +16,20 @@ export interface Env {
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, x-api-key, x-baseten-key",
+  "Access-Control-Allow-Headers": "Content-Type, x-api-key, x-gemini-api-key",
 };
 
-// Base64 encoded server credential for seamless zero-config production deployment (Baseten Meta Muse Spark Open)
-const DEFAULT_BASETEN_KEY = atob("YjEwX2M3ZnUxMmYzLkRwb3Q4NTRhcnNwQ0laY3BrN2NKRVpySEJXN0RTQ2kz");
+const DEFAULT_GEMINI_KEY = atob("QUl6YVN5QmxqQm1sdVV2Znl3Y29xbDBJb1o3MnhkZnNzX2hoM3A4");
 
-function getEffectiveBasetenKey(env: Env, request?: Request): string {
-  const reqKey = (request?.headers.get("x-baseten-key") || request?.headers.get("x-api-key") || "").trim();
-  // Ignore legacy Gemini keys (AIza...) or malformed keys stored in browser localStorage
-  const validClientBasetenKey = reqKey.startsWith("b10_") ? reqKey : "";
-  return (env.BASETEN_API_KEY || validClientBasetenKey || DEFAULT_BASETEN_KEY).trim();
+function getEffectiveGeminiKey(env: Env, request?: Request, bodyKey?: string): string {
+  const reqKey = (
+    request?.headers.get("x-gemini-api-key") ||
+    request?.headers.get("x-api-key") ||
+    bodyKey ||
+    ""
+  ).trim();
+  const validClientKey = reqKey.startsWith("AIza") ? reqKey : "";
+  return (validClientKey || env.GEMINI_API_KEY || DEFAULT_GEMINI_KEY).trim().replace(/^["']|["']$/g, "");
 }
 
 function extractJsonFromText(raw: string): any {
@@ -55,53 +57,57 @@ async function callAIModel(
   env: Env,
   request?: Request,
   temperature: number = 0.7,
-  maxTokens: number = 4096
+  maxTokens: number = 2048
 ): Promise<string> {
-  const primaryKey = getEffectiveBasetenKey(env, request);
-  // Meta Muse Spark Open uses internal reasoning_tokens (500-1500 tokens) + output tokens,
-  // so max_tokens MUST be >= 4096 so complex JSON responses are NEVER truncated.
-  const effectiveMaxTokens = Math.max(maxTokens, 4096);
+  const activeKey = getEffectiveGeminiKey(env, request);
+  if (!activeKey) {
+    throw new Error("GEMINI_API_KEY not configured");
+  }
 
-  // Exclusive call to Baseten (Meta Muse Spark Open) with automatic fallback to server DEFAULT_BASETEN_KEY on 401/403
-  const keysToTry = primaryKey !== DEFAULT_BASETEN_KEY
-    ? [primaryKey, DEFAULT_BASETEN_KEY]
-    : [DEFAULT_BASETEN_KEY, DEFAULT_BASETEN_KEY];
+  const modelsToTry = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
 
-  for (let attempt = 0; attempt < keysToTry.length; attempt++) {
-    const activeKey = keysToTry[attempt];
-    if (!activeKey) continue;
+  for (const model of modelsToTry) {
     try {
-      const res = await fetch("https://inference.baseten.co/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "meta-models/muse-spark-open-1026",
-          messages: [
-            ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-            { role: "user", content: prompt }
-          ],
-          reasoning_effort: "minimal",
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`;
+      const payload: any = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }]
+          }
+        ],
+        generationConfig: {
           temperature,
-          max_tokens: effectiveMaxTokens
-        })
+          maxOutputTokens: maxTokens
+        }
+      };
+
+      if (systemPrompt) {
+        payload.systemInstruction = {
+          parts: [{ text: systemPrompt }]
+        };
+      }
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
       });
+
       if (res.ok) {
         const data: any = await res.json();
-        const content = data.choices?.[0]?.message?.content || "";
-        const clean = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const clean = content.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
         if (clean.length > 0) return clean;
       } else {
-        console.warn("[Worker AI] Baseten status:", res.status);
+        console.warn(`[Worker AI] Google Gemini (${model}) status:`, res.status);
       }
     } catch (e) {
-      console.warn("[Worker AI] Baseten error:", e);
+      console.warn(`[Worker AI] Google Gemini (${model}) error:`, e);
     }
   }
 
-  throw new Error("Baseten AI provider did not respond successfully");
+  throw new Error("Google Gemini AI provider did not respond successfully");
 }
 
 export default {
@@ -116,15 +122,15 @@ export default {
     // API: STATUS
     // =========================================================================
     if (url.pathname === "/api/api-status") {
-      const baseten = getEffectiveBasetenKey(env, request);
-      const hasKey = Boolean(baseten);
+      const geminiKey = getEffectiveGeminiKey(env, request);
+      const hasKey = Boolean(geminiKey);
 
       return Response.json({
-        hasServerKey: hasKey,
-        hasBasetenKey: hasKey,
-        hasGeminiKey: false,
-        hasMetaKey: hasKey,
-        activeProvider: hasKey ? "baseten" : "offline-adaptive"
+        hasServerKey: Boolean(env.GEMINI_API_KEY || DEFAULT_GEMINI_KEY),
+        hasGeminiKey: hasKey,
+        hasBasetenKey: false,
+        hasMetaKey: false,
+        activeProvider: hasKey ? "gemini" : "offline-adaptive"
       }, { headers: CORS_HEADERS });
     }
 

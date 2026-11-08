@@ -38,6 +38,7 @@ let loadedModel: any = null;
 let loadedMetadata: ModelMetadata | null = null;
 let isModelLoading = false;
 let inferenceCounter = 0;
+let lastLocalTelemetryTime = 0;
 
 // Module-level Exponential Moving Average (EMA) smoothing state (alpha = 0.45)
 let emaProbabilities: number[] | null = null;
@@ -164,6 +165,23 @@ export async function loadNeuroSynkBrain(): Promise<{ isReady: boolean; metadata
     }
 
     console.log("🧠 [NeuroSynk AI Core] Neural Network loaded successfully (10,739 samples). Expected accuracy:", loadedMetadata?.accuracy || "93.6%");
+    if (
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ) {
+      fetch('/api/telemetry/boot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'WEBGL_BRAIN_BOOTED',
+          model: 'NeuroSynk Definitive Pure AI Core v3.0',
+          architecture: 'Dense-64 (BN) -> Dense-32 (BN) -> Dense-16 -> Softmax-6',
+          accuracy: loadedMetadata?.accuracy || '93.64%',
+          samples: 10739,
+          timestamp: Date.now()
+        })
+      }).catch(() => {});
+    }
     isModelLoading = false;
     return { isReady: true, metadata: loadedMetadata };
   } catch (error) {
@@ -360,6 +378,44 @@ export function evaluateAIBiometrics(metrics: BiometricMetricsInput): AIPredicti
         badgeBg = "bg-purple-500/10";
         badgeBorder = "border-purple-500/30";
         break;
+    }
+
+    // Real-time Localhost Engineering Telemetry Bridge (for live terminal & DevTools inspection)
+    if (
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+      now - lastLocalTelemetryTime >= 1100
+    ) {
+      lastLocalTelemetryTime = now;
+      const pulsePayload = {
+        timestamp: now,
+        ear_mean: Number(metrics.ear_mean.toFixed(3)),
+        ear_min: Number(metrics.ear_min.toFixed(3)),
+        mar_mean: Number(metrics.mar_mean.toFixed(3)),
+        yaw_mean: Number(metrics.yaw_mean.toFixed(3)),
+        pitch_mean: Number(metrics.pitch_mean.toFixed(3)),
+        roll_angle_mean: Number(metrics.roll_angle_mean.toFixed(1)),
+        frown_mean: Number(metrics.frown_mean.toFixed(3)),
+        shoulder_angle_mean: Number(metrics.shoulder_angle_mean.toFixed(1)),
+        perclos: currentPerclos,
+        focusScore,
+        stressLevel,
+        kappa: Number(kappa.toFixed(2)),
+        classIndex: maxIdx,
+        className: currentClass,
+        confidence: Number((maxProb * 100).toFixed(1)),
+        probabilities: smoothedProbs.map(p => Number((p * 100).toFixed(1)))
+      };
+      console.log(
+        `%c[TF.js 12-D Core]%c PERCLOS: ${currentPerclos}% | EAR: ${pulsePayload.ear_mean} | C.L.A.P.: ${focusScore}% | Load: ${stressLevel}% | State: ${currentClass} (${pulsePayload.confidence}%)`,
+        'color:#10b981;font-weight:bold;',
+        'color:#a1a1aa;'
+      );
+      fetch('/api/telemetry/pulse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pulsePayload)
+      }).catch(() => {});
     }
 
     return {
