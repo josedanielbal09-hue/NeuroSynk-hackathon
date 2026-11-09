@@ -20,6 +20,7 @@ import {
   subdivideStepUniversal,
   testGeminiConnection,
   sanitizeApiKey,
+  getDefaultGoogleApiKey,
   streamMuseSparkIntervention,
   sessionDebriefUniversal,
   celebrateStepUniversal,
@@ -27,6 +28,8 @@ import {
   SessionDebriefResult
 } from './services/metaModelClient';
 import { KawaiiRewardCelebration, REWARD_ARCHETYPES } from './components/rewards/KawaiiRewardCelebration';
+import { NeuroSynkSettingsModal } from './components/settings/NeuroSynkSettingsModal';
+import { useSettings } from './context/SettingsContext';
 
 
 declare global {
@@ -172,57 +175,107 @@ interface SurveyQuestion {
   options: string[];
 }
 
-const DEFAULT_SURVEY_QUESTIONS: SurveyQuestion[] = [
-  {
-    id: "q1",
-    question: "How much time will you dedicate to this session?",
-    options: [
-      "25 to 30 minutes (Short sprint)",
-      "45 to 60 minutes (Standard session)",
-      "90 to 120 minutes (Deep session)"
-    ]
-  },
-  {
-    id: "q2",
-    question: "What tangible outcome do you want to achieve by the end of this block?",
-    options: [
-      "Understand the core concept",
-      "Solve an exercise or section",
-      "Complete a formal deliverable"
-    ]
-  },
-  {
-    id: "q3",
-    question: "What is your familiarity or preparation level with the materials?",
-    options: [
-      "Starting completely from scratch",
-      "I have basics and notes ready",
-      "I master the topic, ready to produce"
-    ]
-  },
-  {
-    id: "q4",
-    question: "How would you describe your energy and focus right now?",
-    options: [
-      "High energy and clear focus",
-      "Moderate / neutral energy",
-      "Scattered mind or initial fatigue"
-    ]
-  },
-  {
-    id: "q5",
-    question: "At what point do you usually experience the most friction or block?",
-    options: [
-      "Breaking initial starting inertia",
-      "Midway through dense technical material",
-      "Wrapping up and polishing final details"
-    ]
-  }
-];
+const getDefaultSurveyQuestions = (lang: 'es' | 'en'): SurveyQuestion[] =>
+  lang === 'es'
+    ? [
+        {
+          id: "q1",
+          question: "¿Cuánto tiempo dedicarás a esta sesión?",
+          options: [
+            "25 a 30 minutos (Sprint corto)",
+            "45 a 60 minutos (Sesión estándar)",
+            "90 a 120 minutos (Sesión profunda)"
+          ]
+        },
+        {
+          id: "q2",
+          question: "¿Qué resultado tangible quieres lograr al terminar este bloque?",
+          options: [
+            "Comprender el concepto central",
+            "Resolver un ejercicio o apartado",
+            "Terminar un entregable concreto"
+          ]
+        },
+        {
+          id: "q3",
+          question: "¿Cuál es tu nivel de preparación o familiaridad con el material?",
+          options: [
+            "Empezando completamente desde cero",
+            "Tengo las bases y apuntes listos",
+            "Domino el tema, listo para producir"
+          ]
+        },
+        {
+          id: "q4",
+          question: "¿Cómo describirías tu energía y enfoque ahora mismo?",
+          options: [
+            "Energía alta y enfoque claro",
+            "Energía moderada / neutral",
+            "Mente dispersa o fatiga inicial"
+          ]
+        },
+        {
+          id: "q5",
+          question: "¿En qué punto sueles sentir mayor bloqueo o fricción?",
+          options: [
+            "Romper la inercia inicial para arrancar",
+            "A mitad del material técnico denso",
+            "Al cerrar y pulir los detalles finales"
+          ]
+        }
+      ]
+    : [
+        {
+          id: "q1",
+          question: "How much time will you dedicate to this session?",
+          options: [
+            "25 to 30 minutes (Short sprint)",
+            "45 to 60 minutes (Standard session)",
+            "90 to 120 minutes (Deep session)"
+          ]
+        },
+        {
+          id: "q2",
+          question: "What tangible outcome do you want to achieve by the end of this block?",
+          options: [
+            "Understand the core concept",
+            "Solve an exercise or section",
+            "Complete a formal deliverable"
+          ]
+        },
+        {
+          id: "q3",
+          question: "What is your familiarity or preparation level with the materials?",
+          options: [
+            "Starting completely from scratch",
+            "I have basics and notes ready",
+            "I master the topic, ready to produce"
+          ]
+        },
+        {
+          id: "q4",
+          question: "How would you describe your energy and focus right now?",
+          options: [
+            "High energy and clear focus",
+            "Moderate / neutral energy",
+            "Scattered mind or initial fatigue"
+          ]
+        },
+        {
+          id: "q5",
+          question: "At what point do you usually experience the most friction or block?",
+          options: [
+            "Breaking initial starting inertia",
+            "Midway through dense technical material",
+            "Wrapping up and polishing final details"
+          ]
+        }
+      ];
 
 type TimerMode = 'WORK' | 'SHORT_BREAK' | 'LONG_BREAK';
 
 export default function App() {
+  const { language, t } = useSettings();
   const [task, setTask] = useState('');
   const [steps, setSteps] = useState<string[]>([]);
   const [isStarted, setIsStarted] = useState(false);
@@ -264,13 +317,31 @@ export default function App() {
 
   const [geminiApiKey, setGeminiApiKey] = useState(() => {
     const isCleared = localStorage.getItem('gemini_api_key_cleared') === 'true';
-    const stored = localStorage.getItem('gemini_api_key');
-    if (stored !== null && stored !== '') return stored;
+    const stored = (localStorage.getItem('gemini_api_key') || '').trim();
+    // Purge any legacy Baseten API key that does not start with Google's "AIza" prefix
+    if (stored && !stored.startsWith('AIza')) {
+      localStorage.removeItem('gemini_api_key');
+      localStorage.removeItem('baseten_api_key');
+      const googleKey = getDefaultGoogleApiKey();
+      localStorage.setItem('gemini_api_key', googleKey);
+      return googleKey;
+    }
+    if (stored.startsWith('AIza')) return stored;
     if (isCleared) return '';
-    return typeof process !== 'undefined' && (process.env as any)?.GEMINI_API_KEY
-      ? (process.env as any).GEMINI_API_KEY
-      : '';
+    const googleKey = getDefaultGoogleApiKey();
+    localStorage.setItem('gemini_api_key', googleKey);
+    return googleKey;
   });
+
+  useEffect(() => {
+    const stored = (localStorage.getItem('gemini_api_key') || '').trim();
+    if (!stored || !stored.startsWith('AIza')) {
+      const googleKey = getDefaultGoogleApiKey();
+      localStorage.removeItem('baseten_api_key');
+      localStorage.setItem('gemini_api_key', googleKey);
+      setGeminiApiKey(googleKey);
+    }
+  }, []);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const currentSessionIdRef = useRef<string | null>(null);
@@ -342,34 +413,62 @@ export default function App() {
   });
 
   useEffect(() => {
+    let isMounted = true;
     const checkApiStatus = async () => {
       const currentKey = (geminiApiKey || localStorage.getItem('gemini_api_key') || (typeof process !== 'undefined' && (process.env as any)?.GEMINI_API_KEY ? (process.env as any).GEMINI_API_KEY : '')).trim();
       if (currentKey) {
-        setApiStatus('browser');
-        return;
+        const res = await testGeminiConnection(currentKey);
+        if (!isMounted) return;
+        setKeyTestResult(res);
+        if (res.success) {
+          setApiStatus('browser');
+          return;
+        }
       }
       try {
         const response = await fetch('/api/api-status');
         if (response.ok) {
           const data = await response.json();
-          if (data.hasGeminiKey || data.hasServerKey) {
-            setApiStatus('server');
+          if (data.keyValid) {
+            if (isMounted) setApiStatus('server');
             return;
           }
         }
       } catch (e) {
         // Static deployment fallback
       }
-      setApiStatus('none');
+      if (isMounted) setApiStatus('none');
     };
     checkApiStatus();
+    return () => {
+      isMounted = false;
+    };
   }, [geminiApiKey]);
 
 
   // Chat States
-  const [chatMessages, setChatMessages] = useState<{ role: string, content: string }[]>([
-    { role: 'assistant', content: 'Quick question? Ask away without breaking your flow.' }
+  const [chatMessages, setChatMessages] = useState<{ role: string, content: string }[]>(() => [
+    {
+      role: 'assistant',
+      content: language === 'es'
+        ? '¿Duda rápida? Pregúntame aquí sin romper tu flujo de enfoque.'
+        : 'Quick question? Ask away without breaking your flow.'
+    }
   ]);
+
+  useEffect(() => {
+    setChatMessages(prev => {
+      if (prev.length === 1 && prev[0].role === 'assistant') {
+        return [{
+          role: 'assistant',
+          content: language === 'es'
+            ? '¿Duda rápida? Pregúntame aquí sin romper tu flujo de enfoque.'
+            : 'Quick question? Ask away without breaking your flow.'
+        }];
+      }
+      return prev;
+    });
+  }, [language]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -521,12 +620,22 @@ export default function App() {
 
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
+  const isStartedRef = useRef(false);
+  const languageRef = useRef<'es' | 'en'>(language);
   const rewardTimeoutRef = useRef<number | null>(null);
 
-  // Sync ref for MediaPipe callback
+  // Sync refs for MediaPipe callback
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
+
+  useEffect(() => {
+    isStartedRef.current = isStarted;
+  }, [isStarted]);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
 
   const currentStepIdxRef = useRef(0);
   useEffect(() => {
@@ -556,9 +665,12 @@ export default function App() {
       }
 
       setIsChatLoading(true);
+      const isEs = languageRef.current === 'es';
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: `⚙️ Analyzing current step difficulty... Breaking "${parentStepText}" down into smaller milestones.`
+        content: isEs
+          ? `⚙️ Analizando dificultad del paso... Dividiendo "${parentStepText}" en 3 micro-hitos más sencillos.`
+          : `⚙️ Analyzing current step difficulty... Breaking "${parentStepText}" down into smaller milestones.`
       }]);
 
       try {
@@ -580,10 +692,9 @@ export default function App() {
 
           setChatMessages(prev => [...prev, {
             role: 'assistant',
-            content: `💡 Done! I split this step into 3 simpler milestones:
-${data.subSteps.map((s: string) => `• ${s}`).join('\n')}
-
-Let's focus on the first sub-step. You've got this!`
+            content: isEs
+              ? `💡 ¡Listo! Dividí este paso en 3 micro-acciones más ligeras:\n${data.subSteps.map((s: string) => `• ${s}`).join('\n')}\n\nEnfoquémonos en el primero. ¡Tú puedes!`
+              : `💡 Done! I split this step into 3 simpler milestones:\n${data.subSteps.map((s: string) => `• ${s}`).join('\n')}\n\nLet's focus on the first sub-step. You've got this!`
           }]);
         } else {
           throw new Error("Invalid response");
@@ -592,7 +703,9 @@ Let's focus on the first sub-step. You've got this!`
         console.error("Error subdividing step:", err);
         setChatMessages(prev => [...prev, {
           role: 'assistant',
-          content: `⚠️ Couldn't break the step down automatically, take a quick breath if you need one.`
+          content: isEs
+            ? `⚠️ No se pudo subdividir el paso automáticamente, respira un momento si lo necesitas.`
+            : `⚠️ Couldn't break the step down automatically, take a quick breath if you need one.`
         }]);
       } finally {
         setIsChatLoading(false);
@@ -601,9 +714,19 @@ Let's focus on the first sub-step. You've got this!`
     };
   }, [steps, task, isChatLoading, geminiApiKey]);
 
-  // Keyboard Listener (Q to pause)
+  // Keyboard Listener (Q to pause) — Shielded against INPUT, TEXTAREA & contentEditable elements
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = (e.target as HTMLElement) || (document.activeElement as HTMLElement);
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       if (isStarted && e.key.toLowerCase() === 'q') {
         setIsPaused(prev => !prev);
       }
@@ -677,12 +800,16 @@ Let's focus on the first sub-step. You've got this!`
           status: 'COMPLETADA'
         });
 
-        // FocusBud synthesizes the debrief with empathetic English voice (5 to 8 seconds)
-        const spokenDebrief = `Session completed successfully! You finished every step of ${task || 'your goal'}. Your average focus was ${avgFocus} percent. Outstanding consistency!`;
+          // FocusBud synthesizes the debrief with empathetic voice in the active language (5 to 8 seconds)
+        const spokenDebrief = languageRef.current === 'es'
+          ? `¡Sesión completada con éxito! Terminaste todos los pasos de ${task || 'tu meta'}. Tu enfoque promedio fue de ${avgFocus} por ciento. ¡Excelente constancia!`
+          : `Session completed successfully! You finished every step of ${task || 'your goal'}. Your average focus was ${avgFocus} percent. Outstanding consistency!`;
         speakFocusBud(spokenDebrief, { force: true, rate: 0.98 });
       }).catch(err => {
         console.warn("[Debrief Error]:", err);
-        const fallback = `SESSION COMPLETE: You finished all steps of "${task}". Your average focus was ${avgFocus}%. Take a deep breath and celebrate this tangible progress.`;
+        const fallback = languageRef.current === 'es'
+          ? `SESIÓN COMPLETADA: Terminaste todos los pasos de "${task}". Tu enfoque promedio fue de ${avgFocus}%. Toma aire profundo y celebra este avance tangible.`
+          : `SESSION COMPLETE: You finished all steps of "${task}". Your average focus was ${avgFocus}%. Take a deep breath and celebrate this tangible progress.`;
         setSessionDebrief(fallback);
 
         const finalSessionId = currentSessionIdRef.current || `session-${Date.now()}`;
@@ -698,7 +825,9 @@ Let's focus on the first sub-step. You've got this!`
           status: 'COMPLETADA'
         });
 
-        const spokenFallback = `Session complete! Great job finishing all your steps. Rest your mind and stretch a bit.`;
+        const spokenFallback = languageRef.current === 'es'
+          ? `¡Sesión completada! Excelente trabajo terminando todos tus pasos. Descansa la mente y estira un poco.`
+          : `Session complete! Great job finishing all your steps. Rest your mind and stretch a bit.`;
         speakFocusBud(spokenFallback, { force: true, rate: 0.98 });
       }).finally(() => {
         setIsDebriefLoading(false);
@@ -815,13 +944,17 @@ Let's focus on the first sub-step. You've got this!`
 
   const currentActiveStep = steps[currentStepIdx] || '';
   const [budMessage, setBudMessage] = useState<string>(() =>
-    getBudContextualMessage('ENFOQUE', { stepText: '', distractionCount: 0 })
+    getBudContextualMessage('ENFOQUE', { stepText: '', distractionCount: 0, lang: language })
   );
 
   useEffect(() => {
     if (isBudStreamingRef.current) return;
     if (isBreakActive) {
-      setBudMessage("Great job. Block complete. Time for a short rest.");
+      setBudMessage(
+        language === 'es'
+          ? '¡Excelente trabajo! Bloque completado. Momento de un breve descanso.'
+          : 'Great job. Block complete. Time for a short rest.'
+      );
       return;
     }
 
@@ -832,10 +965,11 @@ Let's focus on the first sub-step. You've got this!`
 
     const msg = getBudContextualMessage(rawAIState, {
       stepText: currentActiveStep,
-      distractionCount: stepDistractionsRef.current
+      distractionCount: stepDistractionsRef.current,
+      lang: language
     });
     setBudMessage(msg);
-  }, [rawAIState, currentFocusState, currentStepIdx, steps, currentActiveStep, isBreakActive]);
+  }, [rawAIState, currentFocusState, currentStepIdx, steps, currentActiveStep, isBreakActive, language]);
 
   // Reset distraction counter when changing or completing a step
   useEffect(() => {
@@ -934,7 +1068,7 @@ Let's focus on the first sub-step. You've got this!`
 
   const handleStart = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    const finalTask = task.trim() ? task : 'Study general material';
+    const finalTask = task.trim() ? task : (language === 'es' ? 'Estudiar material general' : 'Study general material');
     setTask(finalTask);
     setIsSurveyLoading(true);
 
@@ -943,11 +1077,11 @@ Let's focus on the first sub-step. You've got this!`
       if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
         setSurveyQuestions(data.questions);
       } else {
-        setSurveyQuestions(DEFAULT_SURVEY_QUESTIONS);
+        setSurveyQuestions(getDefaultSurveyQuestions(language));
       }
     } catch (err) {
       console.error("Task survey fetch error:", err);
-      setSurveyQuestions(DEFAULT_SURVEY_QUESTIONS);
+      setSurveyQuestions(getDefaultSurveyQuestions(language));
     } finally {
       setSurveyAnswers({});
       setShowSurvey(true);
@@ -975,12 +1109,21 @@ Let's focus on the first sub-step. You've got this!`
       }
     } catch (err) {
       console.error("Error generating work roadmap:", err);
-      resolvedSteps = [
-        `DEFINE the core objective and scope of '${task}'.`,
-        `ORGANIZE the essential materials or sources to get started.`,
-        `DEVELOP the first central block with full focus.`,
-        `REVIEW and consolidate the progress achieved.`
-      ];
+      resolvedSteps = language === 'es'
+        ? [
+            `DEFINE el objetivo concreto y alcance de '${task}'.`,
+            `ORGANIZA los materiales o herramientas esenciales para comenzar.`,
+            `DESARROLLA el primer bloque central con atención plena.`,
+            `PAUSA SOMÁTICA: Aparta la vista de la pantalla, bebe agua y estira los brazos durante 3 minutos.`,
+            `VERIFICA y consolida el avance logrado.`
+          ]
+        : [
+            `DEFINE the core objective and scope of '${task}'.`,
+            `ORGANIZE the essential materials or sources to get started.`,
+            `DEVELOP the first central block with full focus.`,
+            `SOMATIC PAUSE: Look away from the screen, drink water, and stretch your arms for 3 minutes.`,
+            `REVIEW and consolidate the progress achieved.`
+          ];
     } finally {
       setSteps(resolvedSteps);
 
@@ -1081,7 +1224,9 @@ Let's focus on the first sub-step. You've got this!`
         throw new Error("Invalid response format");
       }
     } catch (err) {
-      resolvedSteps = ['PREPARE materials', 'START first phase', 'REVIEW progress', 'WRAP UP'];
+      resolvedSteps = language === 'es'
+        ? ['PREPARA tus materiales', 'INICIA la primera fase', 'REVISA tu avance', 'CONCLUYE y guarda']
+        : ['PREPARE materials', 'START first phase', 'REVIEW progress', 'WRAP UP'];
     } finally {
       setSteps(resolvedSteps);
       setIsTimerRunning(true);
@@ -1097,7 +1242,7 @@ Let's focus on the first sub-step. You've got this!`
       currentSessionIdRef.current = sId;
       saveSessionItem({
         id: sId,
-        task: task || 'Work Session',
+        task: task || (language === 'es' ? 'Sesión de Trabajo' : 'Work Session'),
         timestamp: Date.now(),
         durationMinutes: 0,
         completedSteps: 0,
@@ -1106,12 +1251,17 @@ Let's focus on the first sub-step. You've got this!`
         status: 'EN_PROGRESO'
       });
 
-      // Autonomous FocusBud voice welcome (3-4 seconds)
+      // Autonomous FocusBud voice welcome (3-4 seconds) in active language
       setTimeout(() => {
-        const welcomePhrases = [
-          `All set! Starting your ${task || 'study'} session. I am right here with you every step of the way.`,
-          `Focus activated! First micro-step underway. Let's move at our own steady pace.`
-        ];
+        const welcomePhrases = languageRef.current === 'es'
+          ? [
+              `¡Todo listo! Iniciamos tu sesión de ${task || 'estudio'}. Estoy aquí contigo en cada paso.`,
+              `¡Enfoque activado! Primer micro-paso en marcha. Avancemos a buen ritmo.`
+            ]
+          : [
+              `All set! Starting your ${task || 'study'} session. I am right here with you every step of the way.`,
+              `Focus activated! First micro-step underway. Let's move at our own steady pace.`
+            ];
         const phrase = welcomePhrases[Math.floor(Math.random() * welcomePhrases.length)];
         speakFocusBud(phrase, { force: true, rate: 0.98 });
       }, 1200);
@@ -1666,49 +1816,60 @@ Let's focus on the first sub-step. You've got this!`
 
 
 
-      // Autonomous task subdivision if Neural Network detects eye fatigue (PERCLOS / Class 3) or focus dropped below 40%
-      if ((metrics.nivel_clap < 40 || displayedClassRef.current === 3 || aiResult.perclos >= 25) && !metrics.is_subdividing && !metrics.subdivided_indexes.includes(currentStepIdxRef.current)) {
+      // Autonomous task subdivision ONLY when focus session is actively running
+      if (
+        isStartedRef.current &&
+        !isPausedRef.current &&
+        (metrics.nivel_clap < 40 || displayedClassRef.current === 3 || aiResult.perclos >= 25) &&
+        !metrics.is_subdividing &&
+        !metrics.subdivided_indexes.includes(currentStepIdxRef.current)
+      ) {
         subdivideCurrentStepRef.current(currentStepIdxRef.current);
       }
 
       // Deterministic Local Postural Hygiene (100% Edge Privacy, zero image/video uploads)
       const pFatiga = aiResult.probabilities[3] || 0;
       const pAgobio = aiResult.probabilities[5] || 0;
+      const isEs = languageRef.current === 'es';
 
       if (now - lastPostureUpdateRef.current >= 600) {
         lastPostureUpdateRef.current = now;
         let pStatus: 'OPTIMAL' | 'NECK_TILT' | 'SHOULDER_TENSION' = 'OPTIMAL';
-        let pLabel = 'Optimal Posture';
+        let pLabel = isEs ? 'Postura Óptima' : 'Optimal Posture';
         let pColor = 'text-emerald-400';
         let pBg = 'bg-emerald-950/40 border-emerald-800/40';
 
         if (pitchMean > 0.62) {
           pStatus = 'NECK_TILT';
-          pLabel = 'Neck Alignment';
+          pLabel = isEs ? 'Alineación de Cuello' : 'Neck Alignment';
           pColor = 'text-amber-400';
           pBg = 'bg-amber-950/40 border-amber-800/40';
         } else if (pAgobio > 0.55 || Math.abs(rollMean) > 22) {
           pStatus = 'SHOULDER_TENSION';
-          pLabel = 'Postural Tension';
+          pLabel = isEs ? 'Tensión Postural' : 'Postural Tension';
           pColor = 'text-rose-400';
           pBg = 'bg-rose-950/40 border-rose-800/40';
         }
 
         setPostureHygiene(prev => {
-          if (prev.status === pStatus) return prev;
+          if (prev.status === pStatus && prev.label === pLabel) return prev;
           return { status: pStatus, label: pLabel, color: pColor, bg: pBg };
         });
       }
 
-      // Proactive Streaming Intervention with Meta Muse Spark to FocusBud when Neural Network detects sustained overload
-      if ((pAgobio > 0.65 || pFatiga > 0.65 || metrics.nivel_carga > 75) && (now - metrics.last_auto_chat > 45000)) {
+      // Proactive Streaming Intervention to FocusBud ONLY when a Focus Session is actively running!
+      if (
+        isStartedRef.current &&
+        !isPausedRef.current &&
+        (pAgobio > 0.65 || pFatiga > 0.65 || metrics.nivel_carga > 75) &&
+        (now - metrics.last_auto_chat > 45000)
+      ) {
         metrics.last_auto_chat = now;
         fatigueEventsCountRef.current += 1;
 
         isBudStreamingRef.current = true;
         let streamAccumulator = "";
 
-        // Compute biometric signal severity to adapt voice duration and cadence (3 to 8 seconds)
         const severity = Math.max(
           Math.round(pFatiga * 100),
           Math.round(pAgobio * 100),
@@ -1721,7 +1882,7 @@ Let's focus on the first sub-step. You've got this!`
             perclos: Math.round(aiResult.perclos),
             fatigueScore: Math.round(pFatiga * 100),
             postureScore: Math.round(metrics.nivel_carga),
-            currentTask: steps[currentStepIdx] || task || 'Work in progress',
+            currentTask: steps[currentStepIdxRef.current] || task || 'Work in progress',
             sessionMinutes: Math.round(elapsedTimeRef.current / 60),
             cognitiveClass: stabilizedResult.className
           },
@@ -1730,34 +1891,35 @@ Let's focus on the first sub-step. You've got this!`
           },
           () => {
             let fullText = streamAccumulator.trim();
-            // Strict sanitization: purge internal reasoning tags or leaks if present
             fullText = fullText.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[*_#"`]/g, '').trim();
             if (/Starts with an? uppercase|Need to consider:|Count:\s*\d|User prompt:/i.test(fullText)) {
               fullText = "";
             }
 
-            // Empathetic verbal micro-summary tailored to signal magnitude (3 to 8 seconds of voice)
             let voiceSummary = "";
             let speechRate = 0.95;
+            const activeEs = languageRef.current === 'es';
 
             if (severity >= 70 || pFatiga > 0.65) {
-              // High fatigue signal: unhurried voice (~6-8s)
-              voiceSummary = "Detecting overload in your pace. Close your eyes and take a deep five-second breath.";
+              voiceSummary = activeEs
+                ? "Detecto sobrecarga en tu ritmo. Cierra los ojos y respira profundo cinco segundos."
+                : "Detecting overload in your pace. Close your eyes and take a deep five-second breath.";
               speechRate = 0.88;
             } else if (pAgobio > 0.65) {
-              // Strain: calming voice (~5-6s)
-              voiceSummary = "Zero pressure. Take a deep breath and make just one click at a time.";
+              voiceSummary = activeEs
+                ? "Cero presión. Respira profundo y da un solo paso a la vez."
+                : "Zero pressure. Take a deep breath and make just one click at a time.";
               speechRate = 0.90;
             } else if (metrics.nivel_carga > 45) {
-              // Postural tension: crisp voice (~3-4s)
-              voiceSummary = "Check your posture: lift your chin and relax your shoulders.";
+              voiceSummary = activeEs
+                ? "Cuida tu postura: eleva la barbilla y relaja los hombros."
+                : "Check your posture: lift your chin and relax your shoulders.";
               speechRate = 1.0;
             } else {
-              voiceSummary = fullText || "Keeping a steady pace. One step at a time.";
+              voiceSummary = fullText || (activeEs ? "Mantenemos un ritmo constante. Un paso a la vez." : "Keeping a steady pace. One step at a time.");
               speechRate = 0.95;
             }
 
-            // If AI text is a clean sentence under 12 words, use it directly
             const wordsCount = fullText.split(/\s+/).filter(Boolean).length;
             if (fullText && wordsCount <= 12 && !/Starts with an? uppercase|Need to consider:/i.test(fullText)) {
               voiceSummary = fullText;
@@ -1769,22 +1931,24 @@ Let's focus on the first sub-step. You've got this!`
             // 2. Post full advice in Support Chat
             setChatMessages(prev => [...prev, {
               role: 'assistant',
-              content: `🤖 [FocusBud / Muse Spark]: ${fullText || voiceSummary}`
+              content: `🤖 [FocusBud]: ${fullText || voiceSummary}`
             }]);
 
-            // 3. Synthesize live voice via Web Speech API (3 to 8 seconds)
-            audioService.speak(voiceSummary, {
-              rate: speechRate,
-              pitch: 1.08,
-              onStart: () => setIsBudSpeaking(true),
-              onEnd: () => {
-                setIsBudSpeaking(false);
-                // Fade out bubble 2.5s after voice finishes to keep UI clean
-                setTimeout(() => {
-                  setBudMessage("");
-                }, 2500);
-              }
-            });
+            // 3. Synthesize live voice ONLY if Focus Session is still active
+            if (isStartedRef.current && !isPausedRef.current) {
+              audioService.speak(voiceSummary, {
+                rate: speechRate,
+                pitch: 1.08,
+                lang: activeEs ? 'es' : 'en',
+                onStart: () => setIsBudSpeaking(true),
+                onEnd: () => {
+                  setIsBudSpeaking(false);
+                  setTimeout(() => {
+                    setBudMessage("");
+                  }, 2500);
+                }
+              });
+            }
 
             setTimeout(() => {
               isBudStreamingRef.current = false;
@@ -1827,11 +1991,19 @@ Let's focus on the first sub-step. You've got this!`
     metrics.nivel_carga = 0;
 
     if (!silent) {
+      const isEs = languageRef.current === 'es';
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: '🔄 Restarting biometric sensors. Please maintain a comfortable posture and neutral expression for 15 seconds to recalibrate.'
+        content: isEs
+          ? '🔄 Reiniciando sensores biométricos. Mantén una postura cómoda y expresión neutral durante 15 segundos para recalibrar.'
+          : '🔄 Restarting biometric sensors. Please maintain a comfortable posture and neutral expression for 15 seconds to recalibrate.'
       }]);
-      speakFocusBud("Recalibrating sensors. Keep a neutral expression and comfortable posture for fifteen seconds.", { force: true, rate: 0.98 });
+      speakFocusBud(
+        isEs
+          ? "Recalibrando sensores. Mantén una postura cómoda y expresión neutral durante quince segundos."
+          : "Recalibrating sensors. Keep a neutral expression and comfortable posture for fifteen seconds.",
+        { force: true, rate: 0.98 }
+      );
     }
 
   };
@@ -1851,7 +2023,9 @@ Let's focus on the first sub-step. You've got this!`
 
     setChatMessages(prev => [...prev, {
       role: 'assistant',
-      content: `🚀 Mission updated successfully! Your new goal is: "${proposedChange.proposedTask}".`
+      content: language === 'es'
+        ? `🚀 ¡Misión actualizada con éxito! Tu nueva meta es: "${proposedChange.proposedTask}".`
+        : `🚀 Mission updated successfully! Your new goal is: "${proposedChange.proposedTask}".`
     }]);
 
     setTimeout(() => {
@@ -1912,18 +2086,28 @@ Let's focus on the first sub-step. You've got this!`
       }
 
       if (nextIdx < steps.length) {
-        // FocusBud vocalization upon completing the step connected live to Baseten /api/step-celebration
+        // FocusBud vocalization upon completing the step connected live to Google Gemini /api/step-celebration
         const nextStepText = steps[nextIdx] || '';
         const isNextSomatic = /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(nextStepText);
         if (isNextSomatic) {
-          speakFocusBud("Step completed. Entering a somatic pause now. Inhale deeply and relax your shoulders.", { force: true });
+          speakFocusBud(
+            languageRef.current === 'es'
+              ? "Paso completado. Entramos en pausa somática. Inhala profundo y relaja los hombros."
+              : "Step completed. Entering a somatic pause now. Inhale deeply and relax your shoulders.",
+            { force: true }
+          );
         } else {
           celebrateStepUniversal(completedStepText, nextStepText, task)
             .then(aiPhrase => {
               speakFocusBud(aiPhrase, { force: true, rate: 1.03 });
             })
             .catch(() => {
-              speakFocusBud("Step mastered! Keep your focus steady on the next one.", { force: true, rate: 1.02 });
+              speakFocusBud(
+                languageRef.current === 'es'
+                  ? "¡Paso dominado! Mantén tu enfoque firme en el siguiente."
+                  : "Step mastered! Keep your focus steady on the next one.",
+                { force: true, rate: 1.02 }
+              );
             });
         }
       }
@@ -1951,10 +2135,10 @@ Let's focus on the first sub-step. You've got this!`
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
                   : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-400 border border-zinc-700/50'
               }`}
-              title={isBrownNoiseActive ? "Disable Brown Noise" : "Enable Brown Noise"}
+              title={isBrownNoiseActive ? (language === 'es' ? 'Desactivar Ruido Marrón' : 'Disable Brown Noise') : (language === 'es' ? 'Activar Ruido Marrón' : 'Enable Brown Noise')}
             >
               <Headphones className={`w-3.5 h-3.5 ${isBrownNoiseActive ? 'text-amber-400 animate-pulse' : 'text-zinc-400'}`} />
-              <span className="hidden sm:inline font-semibold">Brown Noise:</span>
+              <span className="hidden sm:inline font-semibold">{language === 'es' ? 'Ruido Marrón:' : 'Brown Noise:'}</span>
               <span className={`font-bold ${isBrownNoiseActive ? 'text-amber-400' : 'text-zinc-500'}`}>
                 {isBrownNoiseActive ? 'ON' : 'OFF'}
               </span>
@@ -1976,150 +2160,53 @@ Let's focus on the first sub-step. You've got this!`
             )}
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/80 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            title={keyTestResult?.message || (language === 'es' ? 'Ver estado de API Key de Google Gemini' : 'View Google Gemini API Key status')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-900/80 border transition-all cursor-pointer ${
+              apiStatus === 'browser' || apiStatus === 'server'
+                ? 'border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.15)] hover:border-emerald-500/60'
+                : 'border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.15)] hover:border-amber-400'
+            }`}
+          >
             <div className={`w-2 h-2 rounded-full animate-pulse ${
-              apiStatus === 'browser' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' :
-              apiStatus === 'server' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-amber-400'
+              apiStatus === 'browser' || apiStatus === 'server'
+                ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                : 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
             }`} />
-            <span className="font-mono text-[9px] tracking-wider text-emerald-400 uppercase font-semibold">
-              {apiStatus === 'browser' ? 'Google Gemini Active' :
-                apiStatus === 'server' ? 'Google Gemini Active' : 'Gemini Offline'}
+            <span className={`font-mono text-[9px] tracking-wider uppercase font-semibold ${
+              apiStatus === 'browser' || apiStatus === 'server' ? 'text-emerald-400' : 'text-amber-300'
+            }`}>
+              {apiStatus === 'browser' || apiStatus === 'server'
+                ? (language === 'es' ? 'Google Gemini Activo' : 'Google Gemini Active')
+                : (language === 'es' ? 'Motor Local Activo • Cambiar Key' : 'Local Engine Active • Update Key')}
             </span>
-          </div>
+          </button>
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="p-2 hover:bg-zinc-800 hover:text-emerald-400 text-zinc-400 rounded-xl transition-all cursor-pointer"
-            title="Configure Google Gemini API Key"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-zinc-800 hover:text-emerald-400 text-zinc-300 rounded-xl border border-zinc-800 transition-all cursor-pointer text-xs font-medium"
+            title={t.common.settings}
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">{t.common.settings}</span>
           </button>
         </div>
 
-        {/* SETTINGS MODAL */}
-        <AnimatePresence>
-          {isSettingsOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-            >
-              <motion.div
-                initial={{ scale: 0.95, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 20 }}
-                className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl max-w-sm w-full shadow-2xl flex flex-col gap-5"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                    <Settings className="text-emerald-400 w-5 h-5" />
-                  </div>
-                  <div className="flex flex-col">
-                    <h3 className="text-white font-medium text-base tracking-tight">Neural Link Settings</h3>
-                    <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Google Gemini API (3.5 / 2.5 / 2.0 Flash)</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-mono text-zinc-400 uppercase tracking-wider">Google Gemini API Key:</label>
-                  <div className="relative flex items-center">
-                    <input
-                      type={showApiKey ? "text" : "password"}
-                      autoComplete="off"
-                      spellCheck={false}
-                      placeholder="Paste your key (AIzaSy...)"
-                      value={geminiApiKey}
-                      onChange={(e) => {
-                        setGeminiApiKey(e.target.value);
-                        setKeyTestResult(null);
-                      }}
-                      className="w-full px-4 py-3 pr-11 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 text-white placeholder-zinc-700 font-mono text-xs shadow-inner"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute right-3 text-zinc-500 hover:text-zinc-300 transition-colors p-1"
-                      title={showApiKey ? "Hide key" : "Show key"}
-                    >
-                      {showApiKey ? <EyeOff className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-[10px] text-zinc-500 leading-normal font-sans">
-                      Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">Google AI Studio</a>.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={isTestingKey}
-                      onClick={async () => {
-                        setIsTestingKey(true);
-                        setKeyTestResult(null);
-                        const res = await testGeminiConnection(geminiApiKey);
-                        setIsTestingKey(false);
-                        setKeyTestResult(res);
-                      }}
-                      className="text-[10px] font-mono px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
-                    >
-                      {isTestingKey ? 'Testing...' : '⚡ Test Connection'}
-                    </button>
-                  </div>
-                  {keyTestResult && (
-                    <div className={`p-2.5 rounded-xl text-xs font-mono border mt-1 ${
-                      keyTestResult.success
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                        : 'bg-red-500/10 border-red-500/30 text-red-400'
-                    }`}>
-                      {keyTestResult.success ? '✅ ' : '❌ '}
-                      {keyTestResult.message}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2 border-t border-zinc-800/80 pt-4">
-                  <button
-                    onClick={() => {
-                      const cleanKey = sanitizeApiKey(geminiApiKey);
-                      setGeminiApiKey(cleanKey);
-                      try {
-                        localStorage.setItem('gemini_api_key', cleanKey);
-                        localStorage.removeItem('gemini_api_key_cleared');
-                        localStorage.setItem('gemini_confirmed_model', 'gemini-3.5-flash');
-                        setApiStatus(cleanKey ? 'browser' : 'server');
-                      } catch (e) {
-                        console.warn("Storage warning:", e);
-                      }
-                      setIsSettingsOpen(false);
-                    }}
-                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl transition-colors uppercase tracking-wider cursor-pointer"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGeminiApiKey('');
-                      localStorage.removeItem('gemini_api_key');
-                      localStorage.setItem('gemini_api_key_cleared', 'true');
-                      setKeyTestResult(null);
-                    }}
-                    className="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-xl transition-colors cursor-pointer"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    onClick={() => {
-                      setGeminiApiKey(localStorage.getItem('gemini_api_key') || '');
-                      setKeyTestResult(null);
-                      setIsSettingsOpen(false);
-                    }}
-                    className="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-xl transition-colors cursor-pointer"
-                  >
-                    Close
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* COMPREHENSIVE BILINGUAL SETTINGS MODAL */}
+        <NeuroSynkSettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          geminiApiKey={geminiApiKey}
+          setGeminiApiKey={setGeminiApiKey}
+          apiStatus={apiStatus}
+          setApiStatus={setApiStatus}
+          workMode={workMode}
+          setWorkMode={setWorkMode}
+          sensitivity={sensitivity}
+          setSensitivity={setSensitivity}
+          onRecalibrate={() => handleRecalibrate(false)}
+        />
       </>
     );
   };
@@ -2140,10 +2227,10 @@ Let's focus on the first sub-step. You've got this!`
               </div>
               <div>
                 <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
-                  Let's personalize your session
+                  {language === 'es' ? 'Personalicemos tu sesión' : "Let's personalize your session"}
                 </h2>
                 <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-                  Goal: <span className="text-emerald-400 font-medium font-mono">"{task}"</span>
+                  {language === 'es' ? 'Meta:' : 'Goal:'} <span className="text-emerald-400 font-medium font-mono">"{task}"</span>
                 </p>
               </div>
             </div>
@@ -2151,9 +2238,9 @@ Let's focus on the first sub-step. You've got this!`
               type="button"
               onClick={() => setShowSurvey(false)}
               className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-zinc-800/50 cursor-pointer"
-              title="Edit goal"
+              title={language === 'es' ? 'Editar meta' : 'Edit goal'}
             >
-              ← Edit goal
+              {language === 'es' ? '← Editar meta' : '← Edit goal'}
             </button>
           </div>
 
@@ -2214,11 +2301,11 @@ Let's focus on the first sub-step. You've got this!`
               {isLoading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
-                  <span>Generating tailored roadmap...</span>
+                  <span>{language === 'es' ? 'Generando ruta de trabajo a medida...' : 'Generating tailored roadmap...'}</span>
                 </>
               ) : (
                 <>
-                  GENERATE WORK ROADMAP 🚀
+                  {language === 'es' ? 'GENERAR RUTA DE TRABAJO 🚀' : 'GENERATE WORK ROADMAP 🚀'}
                 </>
               )}
             </button>
@@ -2229,18 +2316,129 @@ Let's focus on the first sub-step. You've got this!`
               onClick={() => handleGenerateFromSurvey(false)}
               className="w-full py-2.5 text-xs sm:text-sm text-zinc-500 hover:text-zinc-300 font-medium transition-colors text-center cursor-pointer disabled:opacity-50"
             >
-              Skip and start right away
+              {language === 'es' ? 'Omitir y comenzar de inmediato' : 'Skip and start right away'}
             </button>
           </div>
         </motion.div>
       </div>
   );
 
+  const handleLaunchFromStudio = async (
+    finalTask: string,
+    customSteps?: string[],
+    contextSummary?: string
+  ) => {
+    const resolvedTask = finalTask.trim() ? finalTask.trim() : (task.trim() || 'Study general material');
+    setTask(resolvedTask);
+
+    if (customSteps && customSteps.length > 0) {
+      setSteps(customSteps);
+      const wDur = 25 * 60;
+      const bDur = 5 * 60;
+      setWorkDuration(wDur);
+      setBreakDuration(bDur);
+      setTotalTargetBlocks(2);
+      setCompletedBlocks(0);
+      setTimerMode('WORK');
+      setTimerSecondsLeft(wDur);
+      setIsTimerRunning(true);
+      setCurrentStepIdx(0);
+      setIsLoading(false);
+      setShowSurvey(false);
+      setIsStarted(true);
+      setAppStage('FOCUS');
+
+      const sId = `session-${Date.now()}`;
+      currentSessionIdRef.current = sId;
+      saveSessionItem({
+        id: sId,
+        task: resolvedTask,
+        timestamp: Date.now(),
+        durationMinutes: 0,
+        completedSteps: 0,
+        totalSteps: customSteps.length,
+        avgFocus: 100,
+        status: 'EN_PROGRESO'
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    let resolvedSteps: string[] = [];
+    try {
+      const data = await splitTaskUniversal(
+        resolvedTask,
+        surveyAnswers,
+        `Work mode: ${workMode}, Sensitivity: ${sensitivity}${contextSummary ? ` | Context: ${contextSummary}` : ''}`,
+        geminiApiKey
+      );
+      if (data.steps && Array.isArray(data.steps) && data.steps.length > 0) {
+        resolvedSteps = data.steps
+          .map((s: any) =>
+            String(typeof s === 'string' ? s : s?.step || s?.text || s?.description || s?.action || s || '')
+              .replace(/(Step \d+\.\d+:|Step \d+:|Paso \d+\.\d+:|Paso \d+:)/i, '')
+              .trim()
+          )
+          .filter(Boolean);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (err) {
+      console.error('Error generating work roadmap from Studio:', err);
+      resolvedSteps = language === 'es'
+        ? [
+            `DEFINE el objetivo concreto y alcance de '${resolvedTask}'.`,
+            `ORGANIZA los materiales o herramientas esenciales para comenzar.`,
+            `DESARROLLA el primer bloque central con atención plena.`,
+            `PAUSA SOMÁTICA: Aparta la vista de la pantalla, bebe agua y estira los brazos durante 3 minutos.`,
+            `VERIFICA y consolida el avance logrado en la sesión.`
+          ]
+        : [
+            `DEFINE the core objective and scope of '${resolvedTask}'.`,
+            `ORGANIZE the essential materials or sources to get started.`,
+            `DEVELOP the first central block with full focus.`,
+            `SOMATIC PAUSE: Look away from the screen, drink water, and stretch your arms for 3 minutes.`,
+            `REVIEW and consolidate the progress achieved.`
+          ];
+    } finally {
+      setSteps(resolvedSteps);
+      const wDur = 25 * 60;
+      const bDur = 5 * 60;
+      setWorkDuration(wDur);
+      setBreakDuration(bDur);
+      setTotalTargetBlocks(2);
+      setCompletedBlocks(0);
+      setTimerMode('WORK');
+      setTimerSecondsLeft(wDur);
+      setIsTimerRunning(true);
+      setCurrentStepIdx(0);
+      setIsLoading(false);
+      setShowSurvey(false);
+      setIsStarted(true);
+      setAppStage('FOCUS');
+
+      const sId = `session-${Date.now()}`;
+      currentSessionIdRef.current = sId;
+      saveSessionItem({
+        id: sId,
+        task: resolvedTask,
+        timestamp: Date.now(),
+        durationMinutes: 0,
+        completedSteps: 0,
+        totalSteps: resolvedSteps.length,
+        avgFocus: 100,
+        status: 'EN_PROGRESO'
+      });
+    }
+  };
+
   const renderLoginStage = () => (
     <GeminiHeroInput
       task={task}
       setTask={setTask}
       onSubmit={handleStart}
+      onLaunchFocusSession={handleLaunchFromStudio}
+      geminiApiKey={geminiApiKey}
       isLoading={isLoading}
       isSurveyLoading={isSurveyLoading}
       workMode={workMode}
@@ -2306,8 +2504,21 @@ Let's focus on the first sub-step. You've got this!`
     </div>
   );
 
+  const translateAIClassName = (rawClass?: string) => {
+    if (!rawClass) return isAIBrainReady ? (language === 'es' ? 'ENFOQUE' : 'FOCUS') : (language === 'es' ? 'CALIBRANDO' : 'CALIBRATING');
+    if (language !== 'es') return rawClass;
+    const upper = rawClass.toUpperCase();
+    if (upper.includes('NORMAL') || upper.includes('NEUTRAL')) return 'ESTUDIO NORMAL / NEUTRO';
+    if (upper.includes('FLOW') || upper.includes('DEEP')) return 'ENFOQUE PROFUNDO (FLOW)';
+    if (upper.includes('DISTRAC')) return 'DISTRACCIÓN COGNITIVA';
+    if (upper.includes('FATIG')) return 'FATIGA VISUAL';
+    if (upper.includes('OVERSTIM')) return 'SOBREESTIMULACIÓN';
+    if (upper.includes('STRAIN') || upper.includes('POSTUR')) return 'TENSIÓN POSTURAL';
+    return rawClass;
+  };
+
   const renderFocusStage = () => (
-    <div className="lg:h-screen lg:overflow-hidden bg-zinc-950 text-zinc-300 font-sans p-4 xl:p-8 flex flex-col lg:flex-row gap-6 items-stretch">
+    <div className="lg:h-screen lg:overflow-hidden bg-zinc-950 text-zinc-300 font-sans pt-16 sm:pt-20 pb-4 px-4 xl:px-8 flex flex-col lg:flex-row gap-5 items-stretch">
 
       {/* LEFT PANEL: VIDEO, BIOMETRICS & CHAT - Staged GPU Entrance */}
       <motion.div
@@ -2322,7 +2533,7 @@ Let's focus on the first sub-step. You've got this!`
           <div className="bg-zinc-900 p-5 rounded-3xl shadow-xl border border-zinc-800/50">
             <div className="flex justify-between items-center mb-3">
               <span className="font-mono text-[10px] sm:text-xs text-zinc-400 flex items-center gap-2 tracking-widest">
-                <Target className="w-4 h-4 text-emerald-500" /> PERFORMANCE (C.L.A.P.)
+                <Target className="w-4 h-4 text-emerald-500" /> {language === 'es' ? 'RENDIMIENTO (C.L.A.P.)' : 'PERFORMANCE (C.L.A.P.)'}
               </span>
             </div>
             <div className="h-3 w-full bg-zinc-950 rounded-full overflow-hidden shadow-inner flex items-center">
@@ -2336,7 +2547,7 @@ Let's focus on the first sub-step. You've got this!`
           <div className="bg-zinc-900 p-5 rounded-3xl shadow-xl border border-zinc-800/50">
             <div className="flex justify-between items-center mb-3">
               <span className="font-mono text-[10px] sm:text-xs text-zinc-400 flex items-center gap-2 tracking-widest">
-                <Activity className="w-4 h-4 text-rose-500" /> COGNITIVE LOAD
+                <Activity className="w-4 h-4 text-rose-500" /> {language === 'es' ? 'CARGA COGNITIVA' : 'COGNITIVE LOAD'}
               </span>
             </div>
             <div className="h-3 w-full bg-zinc-950 rounded-full overflow-hidden shadow-inner flex items-center">
@@ -2350,7 +2561,7 @@ Let's focus on the first sub-step. You've got this!`
           <div className="bg-zinc-900 p-5 rounded-3xl shadow-xl border border-zinc-800/50 flex flex-col justify-between">
             <div className="flex justify-between items-center mb-2">
               <span className="font-mono text-[10px] sm:text-xs text-zinc-400 flex items-center gap-2 tracking-widest">
-                <BrainCircuit className="w-4 h-4 text-cyan-400" /> AI NEURAL NETWORK
+                <BrainCircuit className="w-4 h-4 text-cyan-400" /> {language === 'es' ? 'RED NEURONAL IA' : 'AI NEURAL NETWORK'}
               </span>
               <span className="font-mono text-[9px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold uppercase tracking-wider">
                 TF.js 4.22
@@ -2358,7 +2569,7 @@ Let's focus on the first sub-step. You've got this!`
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold font-mono text-white tracking-wide">
-                {aiPrediction ? aiPrediction.className : (isAIBrainReady ? 'FOCUS' : 'CALIBRATING')}
+                {translateAIClassName(aiPrediction?.className)}
               </span>
               <span className="text-xs font-mono text-zinc-400 font-semibold">
                 {aiPrediction ? `${(aiPrediction.confidence * 100).toFixed(0)}% Conf.` : (isAIBrainReady ? '100%' : 'Ready')}
@@ -2397,7 +2608,7 @@ Let's focus on the first sub-step. You've got this!`
             <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2 z-20 pointer-events-auto">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-md bg-black/60 backdrop-blur-md font-mono text-[10px] text-zinc-400 flex items-center gap-2 shadow-2xl border border-zinc-800">
-                  <div className={`w-2 h-2 rounded-full ${isPaused ? 'bg-blue-500' : 'bg-red-500 animate-pulse'}`} /> {isPaused ? 'PAUSED' : 'LOCAL INFERENCE (TF.js)'}
+                  <div className={`w-2 h-2 rounded-full ${isPaused ? 'bg-blue-500' : 'bg-red-500 animate-pulse'}`} /> {isPaused ? (language === 'es' ? 'PAUSADO' : 'PAUSED') : (language === 'es' ? 'INFERENCIA LOCAL (TF.js)' : 'LOCAL INFERENCE (TF.js)')}
                 </span>
 
                 {/* Edge Postural Hygiene Chip (100% Deterministic / Local) */}
@@ -2412,24 +2623,24 @@ Let's focus on the first sub-step. You've got this!`
                   type="button"
                   onClick={handleTriggerTestGrounding}
                   className="px-2.5 py-1 rounded text-[10px] font-mono tracking-wider uppercase bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-400 hover:text-emerald-200 border border-emerald-800/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-                  title="Simulate break to test grounding exercises"
+                  title={language === 'es' ? 'Simular pausa para ejercicios de regulación' : 'Simulate break to test grounding exercises'}
                 >
-                  <span>☕ </span> {timerMode === 'SHORT_BREAK' || timerMode === 'LONG_BREAK' ? 'BACK TO FOCUS' : 'TEST GROUNDING'}
+                  <span>☕ </span> {timerMode === 'SHORT_BREAK' || timerMode === 'LONG_BREAK' ? (language === 'es' ? 'VOLVER AL ENFOQUE' : 'BACK TO FOCUS') : (language === 'es' ? 'PAUSA SOMÁTICA' : 'TEST GROUNDING')}
                 </button>
 
                 <button
                   onClick={() => handleRecalibrate(false)}
                   className="px-2.5 py-1 rounded text-[10px] font-mono tracking-wider uppercase bg-zinc-800/60 hover:bg-zinc-700/60 text-zinc-400 hover:text-zinc-200 border border-zinc-700/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-lg"
-                  title="Restart biometric calibration"
+                  title={language === 'es' ? 'Reiniciar calibración biométrica' : 'Restart biometric calibration'}
                 >
-                  <span>🔄</span> RECALIBRATE AI
+                  <span>🔄</span> {language === 'es' ? 'RECALIBRAR IA' : 'RECALIBRATE AI'}
                 </button>
               </div>
             </div>
 
             {isPaused && (
               <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-20 flex items-center justify-center pointer-events-none">
-                <span className="text-3xl font-black tracking-[0.3em] text-blue-400 font-mono drop-shadow-[0_0_20px_rgba(59,130,246,0.8)]">PAUSED</span>
+                <span className="text-3xl font-black tracking-[0.3em] text-blue-400 font-mono drop-shadow-[0_0_20px_rgba(59,130,246,0.8)]">{language === 'es' ? 'PAUSADO' : 'PAUSED'}</span>
               </div>
             )}
           </div>
@@ -2439,7 +2650,7 @@ Let's focus on the first sub-step. You've got this!`
             {/* Header */}
             <div className="px-5 py-4 bg-zinc-950/50 border-b border-zinc-800 flex items-center gap-2 shrink-0">
               <MessageSquare className="w-5 h-5 text-emerald-500" />
-              <span className="font-mono text-sm tracking-widest text-zinc-300 font-semibold uppercase">Support Chat</span>
+              <span className="font-mono text-sm tracking-widest text-zinc-300 font-semibold uppercase">{language === 'es' ? 'Chat de Apoyo' : 'Support Chat'}</span>
             </div>
             {/* Messages view */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 no-scrollbar scroll-smooth">
@@ -2464,12 +2675,12 @@ Let's focus on the first sub-step. You've got this!`
                   className="max-w-[95%] self-start bg-zinc-900 border-2 border-emerald-500/30 rounded-2xl p-5 flex flex-col gap-4 shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 >
                   <div className="flex flex-col gap-1.5">
-                    <span className="font-mono text-[10px] tracking-widest text-emerald-500 uppercase font-bold">💡 New Mission Proposal</span>
+                    <span className="font-mono text-[10px] tracking-widest text-emerald-500 uppercase font-bold">{language === 'es' ? '💡 Nueva Propuesta de Misión' : '💡 New Mission Proposal'}</span>
                     <h4 className="text-white font-semibold text-sm leading-snug">{proposedChange.proposedTask}</h4>
                   </div>
 
                   <div className="flex flex-col gap-1 border-t border-zinc-800 pt-3">
-                    <span className="font-mono text-[9px] tracking-wider text-zinc-500 uppercase">Action Micro-Steps:</span>
+                    <span className="font-mono text-[9px] tracking-wider text-zinc-500 uppercase">{language === 'es' ? 'Micro-Pasos de Acción:' : 'Action Micro-Steps:'}</span>
                     <ul className="text-xs text-zinc-400 space-y-1.5 mt-1 list-disc pl-4 leading-relaxed">
                       {proposedChange.proposedSteps.map((step, idx) => (
                         <li key={idx}>{step}</li>
@@ -2482,19 +2693,44 @@ Let's focus on the first sub-step. You've got this!`
                       onClick={handleAcceptProposal}
                       className="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl transition-colors cursor-pointer uppercase tracking-wider"
                     >
-                      Accept New Task
+                      {language === 'es' ? 'Aceptar Nueva Tarea' : 'Accept New Task'}
                     </button>
                     <button
                       onClick={() => setProposedChange(null)}
                       className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 hover:text-white text-zinc-400 text-xs rounded-xl transition-colors cursor-pointer"
                     >
-                      Dismiss
+                      {language === 'es' ? 'Descartar' : 'Dismiss'}
                     </button>
                   </div>
                 </motion.div>
               )}
 
               <div ref={messagesEndRef} />
+            </div>
+            {/* Quick In-Chat Studio Functions inside Focus Mode */}
+            <div className="px-4 py-2 bg-zinc-950/60 border-t border-zinc-800/80 flex flex-wrap items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                disabled={isChatLoading}
+                onClick={() => subdivideCurrentStepRef.current(currentStepIdx)}
+                className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-mono cursor-pointer transition-colors"
+              >
+                {language === 'es' ? '✂️ Subdividir paso actual' : '✂️ Subdivide active step'}
+              </button>
+              <button
+                type="button"
+                disabled={isChatLoading}
+                onClick={() => {
+                  const activeStep = steps[currentStepIdx] || task;
+                  const tracyMsg = language === 'es'
+                    ? `💡 Ideas rápidas (Brian Tracy) para "${activeStep}":\n1. Regla de 2 min: escribe solo la primera línea o fórmula.\n2. Pareto 80/20: resuelve primero el caso central.\n3. Feynman: explícalo en voz alta en 60 segundos.`
+                    : `💡 Quick Brian Tracy ideas for "${activeStep}":\n1. 2-Min Rule: write just the first line or formula.\n2. Pareto 80/20: solve the core case first.\n3. Feynman: explain it out loud in 60 seconds.`;
+                  setChatMessages(prev => [...prev, { role: 'assistant', content: tracyMsg }]);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-mono cursor-pointer transition-colors"
+              >
+                {language === 'es' ? '💡 Ideas Brian Tracy' : '💡 Brian Tracy Ideas'}
+              </button>
             </div>
             {/* Input form */}
             <form onSubmit={handleSendChat} className="p-4 bg-zinc-950/30 border-t border-zinc-800 shrink-0">
@@ -2503,7 +2739,7 @@ Let's focus on the first sub-step. You've got this!`
                   type="text"
                   value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
-                  placeholder="Ask without losing focus..."
+                  placeholder={language === 'es' ? 'Pregunta sin perder tu enfoque...' : 'Ask without losing focus...'}
                   className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 text-white placeholder-zinc-600 font-mono transition-shadow min-w-0"
                 />
                 <button type="submit" disabled={isChatLoading || !chatInput.trim()} className="bg-emerald-500 text-black px-4 rounded-xl flex items-center justify-center hover:bg-emerald-400 disabled:opacity-50 disabled:hover:bg-emerald-500 transition-colors shrink-0">
@@ -2538,10 +2774,10 @@ Let's focus on the first sub-step. You've got this!`
               </div>
               <div className="flex flex-col gap-0.5 min-w-0">
                 <h2 className="text-white text-base sm:text-lg tracking-tight font-medium flex items-center gap-2">
-                  Autonomous AI Mentor
+                  {language === 'es' ? 'Mentor IA Autónomo' : 'Autonomous AI Mentor'}
                 </h2>
                 <p className="text-xs font-mono text-zinc-400 truncate max-w-[220px]" title={task}>
-                  GOAL: <span className="text-emerald-400 font-semibold">{task || 'Focus Session'}</span>
+                  {language === 'es' ? 'META:' : 'GOAL:'} <span className="text-emerald-400 font-semibold">{task || (language === 'es' ? 'Sesión de Enfoque' : 'Focus Session')}</span>
                 </p>
               </div>
             </div>
@@ -2551,7 +2787,7 @@ Let's focus on the first sub-step. You've got this!`
                 onClick={() => setIsPaused(!isPaused)}
                 className={`flex items-center justify-center w-10 h-10 rounded-xl shadow-lg border transition-colors cursor-pointer ${isPaused ? 'bg-blue-500 border-blue-400 text-black' : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700 text-zinc-300'
                   }`}
-                title="Pause / Resume (Press Q)"
+                title={language === 'es' ? 'Pausar / Reanudar (Tecla Q)' : 'Pause / Resume (Press Q)'}
               >
                 {isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
               </button>
@@ -2569,11 +2805,11 @@ Let's focus on the first sub-step. You've got this!`
                     {timerMode === 'WORK' ? (
                       <>
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        🟢 FOCUS | BLOCK {Math.min(completedBlocks + 1, totalTargetBlocks)}/{totalTargetBlocks}
+                        {language === 'es' ? `🟢 ENFOQUE | BLOQUE ${Math.min(completedBlocks + 1, totalTargetBlocks)}/${totalTargetBlocks}` : `🟢 FOCUS | BLOCK ${Math.min(completedBlocks + 1, totalTargetBlocks)}/${totalTargetBlocks}`}
                       </>
                     ) : (
                       <>
-                        ☕ BREAK
+                        {language === 'es' ? '☕ DESCANSO' : '☕ BREAK'}
                       </>
                     )}
                   </span>
@@ -2609,7 +2845,7 @@ Let's focus on the first sub-step. You've got this!`
                     className="absolute right-0 top-14 z-50 bg-zinc-900/95 backdrop-blur-md border border-zinc-800 rounded-2xl p-3 shadow-2xl w-64 text-xs space-y-2 select-none"
                   >
                     <div className="flex justify-between items-center pb-2 border-b border-zinc-800 text-[11px] font-mono text-zinc-400 font-bold uppercase tracking-wider">
-                      <span>Calibrate Pomodoro</span>
+                      <span>{language === 'es' ? 'Calibrar Pomodoro' : 'Calibrate Pomodoro'}</span>
                       <button onClick={() => setIsTimerConfigOpen(false)} className="text-zinc-500 hover:text-zinc-300 p-0.5 cursor-pointer">✕</button>
                     </div>
                     <div className="space-y-1.5">
@@ -2629,7 +2865,7 @@ Let's focus on the first sub-step. You've got this!`
                       >
                         <div>
                           <div className="font-semibold text-xs">25 min / 5 min</div>
-                          <div className="text-[10px] text-zinc-500">Classic Pomodoro</div>
+                          <div className="text-[10px] text-zinc-500">{language === 'es' ? 'Pomodoro Clásico' : 'Classic Pomodoro'}</div>
                         </div>
                         <span className="text-[11px] font-mono text-emerald-400 font-bold">25/5</span>
                       </button>
@@ -2649,7 +2885,7 @@ Let's focus on the first sub-step. You've got this!`
                       >
                         <div>
                           <div className="font-semibold text-xs">40 min / 10 min</div>
-                          <div className="text-[10px] text-zinc-500">Moderate Deep Work</div>
+                          <div className="text-[10px] text-zinc-500">{language === 'es' ? 'Trabajo Profundo Moderado' : 'Moderate Deep Work'}</div>
                         </div>
                         <span className="text-[11px] font-mono text-cyan-400 font-bold">40/10</span>
                       </button>
@@ -2669,7 +2905,7 @@ Let's focus on the first sub-step. You've got this!`
                       >
                         <div>
                           <div className="font-semibold text-xs">50 min / 10 min</div>
-                          <div className="text-[10px] text-zinc-500">Extended Sprint</div>
+                          <div className="text-[10px] text-zinc-500">{language === 'es' ? 'Sprint Extendido' : 'Extended Sprint'}</div>
                         </div>
                         <span className="text-[11px] font-mono text-purple-400 font-bold">50/10</span>
                       </button>
@@ -2693,7 +2929,7 @@ Let's focus on the first sub-step. You've got this!`
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
                     <span className="font-semibold tracking-wider text-zinc-300">
-                      STEP {currentStepIdx + 1} OF {steps.length}
+                      {language === 'es' ? `PASO ${currentStepIdx + 1} DE ${steps.length}` : `STEP ${currentStepIdx + 1} OF ${steps.length}`}
                     </span>
                     <span className="text-emerald-400 font-bold">
                       {Math.round((currentStepIdx / steps.length) * 100)}%
@@ -2710,13 +2946,13 @@ Let's focus on the first sub-step. You've got this!`
                 </div>
 
                 {/* b) Single Action Card */}
-                <div className="my-auto py-6 flex items-center justify-center flex-1 w-full min-h-[220px]">
+                <div className="my-auto py-3 flex items-center justify-center flex-1 w-full min-h-[145px]">
                   <motion.div
                     key={`step-card-${currentStepIdx}`}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.15, ease: "easeOut" }}
-                    className={`w-full p-6 sm:p-8 rounded-3xl flex flex-col items-center justify-center text-center relative group transition-colors duration-200 ${
+                    className={`w-full p-5 sm:p-6 rounded-3xl flex flex-col items-center justify-center text-center relative group transition-colors duration-200 ${
                       /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '')
                         ? 'bg-gradient-to-b from-amber-950/30 via-zinc-950/90 to-zinc-950 border border-amber-500/40 shadow-[0_0_35px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20'
                         : 'bg-zinc-950 border border-zinc-800/80 shadow-2xl hover:border-emerald-500/30'
@@ -2725,19 +2961,19 @@ Let's focus on the first sub-step. You've got this!`
                     {/^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '') ? (
                       <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono font-semibold uppercase tracking-wider mb-5 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
                         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                        Somatic Pause / Bio-Regulation
+                        {language === 'es' ? 'Pausa Somática / Bio-Regulación' : 'Somatic Pause / Bio-Regulation'}
                       </div>
                     ) : (
                       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono font-medium uppercase tracking-wider mb-5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Active Step
+                        {language === 'es' ? 'Paso Activo' : 'Active Step'}
                       </div>
                     )}
 
                     <p className={`text-xl sm:text-2xl font-semibold leading-relaxed tracking-tight max-w-md break-words select-text ${
                       /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '') ? 'text-amber-100 font-medium' : 'text-white'
                     }`}>
-                      {steps[currentStepIdx] || 'Loading step...'}
+                      {steps[currentStepIdx] || (language === 'es' ? 'Cargando paso...' : 'Loading step...')}
                     </p>
                   </motion.div>
                 </div>
@@ -2752,7 +2988,7 @@ Let's focus on the first sub-step. You've got this!`
                         : 'bg-zinc-950/80 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
                     }`}>
                       <Zap className={`w-3.5 h-3.5 ${isShowingReward ? 'animate-bounce text-amber-400' : 'text-emerald-400'}`} />
-                      <span>ENERGY +100 CLAP • DOPAMINE</span>
+                      <span>{language === 'es' ? 'ENERGÍA +100 CLAP • DOPAMINA' : 'ENERGY +100 CLAP • DOPAMINE'}</span>
                       <Sparkles className={`w-3.5 h-3.5 ${isShowingReward ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
                     </div>
                   </div>
@@ -2767,20 +3003,24 @@ Let's focus on the first sub-step. You've got this!`
                         : 'bg-green-500 hover:bg-green-400 text-black shadow-[0_0_30px_rgba(34,197,94,0.25)]'
                     }`}
                   >
-                    {isShowingReward ? "FULL MOMENTUM! 🚀" : /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '') ? "FINISH PAUSE & CONTINUE ▶️" : "COMPLETE STEP"}
+                    {isShowingReward
+                      ? (language === 'es' ? '¡IMPULSO TOTAL! 🚀' : 'FULL MOMENTUM! 🚀')
+                      : /^(SOMATIC\s+(PAUSE|BREAK)|PAUSA(\s+SOMÁTICA)?)/i.test(steps[currentStepIdx] || '')
+                      ? (language === 'es' ? 'TERMINAR PAUSA Y CONTINUAR ▶️' : 'FINISH PAUSE & CONTINUE ▶️')
+                      : (language === 'es' ? 'COMPLETAR PASO' : 'COMPLETE STEP')}
                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
                   </button>
 
                   {currentStepIdx + 1 < steps.length ? (
                     <div className="flex items-center justify-center gap-1.5 mt-2.5 text-[11px] font-mono text-zinc-400">
-                      <span className="text-zinc-500 font-semibold">NEXT:</span>
+                      <span className="text-zinc-500 font-semibold">{language === 'es' ? 'SIGUIENTE:' : 'NEXT:'}</span>
                       <span className="truncate max-w-[280px] text-zinc-300 font-medium">
                         {steps[currentStepIdx + 1]}
                       </span>
                     </div>
                   ) : (
                     <p className="text-[10px] uppercase tracking-wider font-mono text-center text-emerald-400/80 mt-2.5 font-semibold">
-                      FINAL STEP • GOAL ALMOST REACHED
+                      {language === 'es' ? 'PASO FINAL • META CASI ALCANZADA' : 'FINAL STEP • GOAL ALMOST REACHED'}
                     </p>
                   )}
                 </div>
@@ -2800,21 +3040,21 @@ Let's focus on the first sub-step. You've got this!`
 
                 <div className="space-y-0.5 shrink-0">
                   <h3 className="font-black text-2xl sm:text-3xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-green-300 to-teal-200">
-                    SESSION COMPLETED!
+                    {language === 'es' ? '¡SESIÓN COMPLETADA!' : 'SESSION COMPLETED!'}
                   </h3>
                   <p className="text-xs sm:text-sm text-zinc-400 font-medium truncate max-w-[320px]">
-                    {task || "Work Session"}
+                    {task || (language === 'es' ? 'Sesión de Trabajo' : 'Work Session')}
                   </p>
                 </div>
 
                 {/* Session Summary Metrics */}
                 <div className="grid grid-cols-2 gap-2 w-full my-0.5 shrink-0">
                   <div className="px-3 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 font-mono text-xs text-zinc-400 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-emerald-400" /> Time:</span>
+                    <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-emerald-400" /> {language === 'es' ? 'Tiempo:' : 'Time:'}</span>
                     <strong className="text-white">{formatTime(elapsedTime)}</strong>
                   </div>
                   <div className="px-3 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 font-mono text-xs text-zinc-400 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5"><BrainCircuit className="w-3.5 h-3.5 text-cyan-400" /> Avg Focus:</span>
+                    <span className="flex items-center gap-1.5"><BrainCircuit className="w-3.5 h-3.5 text-cyan-400" /> {language === 'es' ? 'Enfoque:' : 'Avg Focus:'}</span>
                     <strong className="text-white">
                       {focusSamplesRef.current.length > 0 
                         ? `${Math.round(focusSamplesRef.current.reduce((a, b) => a + b, 0) / focusSamplesRef.current.length)}%` 
@@ -2823,25 +3063,25 @@ Let's focus on the first sub-step. You've got this!`
                   </div>
                 </div>
 
-                {/* Cognitive Debrief Card with Meta Muse Spark on Baseten */}
+                {/* Cognitive Debrief Card with Google Gemini */}
                 <div className="w-full text-left p-3.5 rounded-2xl bg-zinc-900/90 border border-purple-500/30 shadow-inner space-y-1.5 max-h-36 sm:max-h-44 overflow-y-auto custom-scrollbar">
                   <div className="flex items-center justify-between sticky top-0 bg-zinc-900/95 py-0.5 z-10 backdrop-blur-sm">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-purple-400" />
                       <span className="text-[10px] font-mono tracking-wider uppercase text-purple-300 font-bold">
-                        Cognitive Debrief • Meta Muse Spark
+                        {language === 'es' ? 'Debrief Cognitivo • Google Gemini' : 'Cognitive Debrief • Google Gemini'}
                       </span>
                     </div>
                     {isDebriefLoading && (
-                      <span className="text-[9px] font-mono text-zinc-400 animate-pulse">Synthesizing...</span>
+                      <span className="text-[9px] font-mono text-zinc-400 animate-pulse">{language === 'es' ? 'Sintetizando...' : 'Synthesizing...'}</span>
                     )}
                   </div>
 
                   <p className="text-xs sm:text-sm text-zinc-200 leading-relaxed font-sans">
                     {isDebriefLoading ? (
-                      <span className="text-zinc-500 italic">Generating cognitive analysis with Meta Muse Spark on Baseten...</span>
+                      <span className="text-zinc-500 italic">{language === 'es' ? 'Generando análisis cognitivo con Google Gemini...' : 'Generating cognitive analysis with Google Gemini...'}</span>
                     ) : (
-                      sessionDebrief || "Outstanding discipline. You maintained cognitive stability and closed your work cycle."
+                      sessionDebrief || (language === 'es' ? 'Excelente disciplina. Mantuviste tu estabilidad cognitiva y cerraste tu ciclo de trabajo.' : 'Outstanding discipline. You maintained cognitive stability and closed your work cycle.')
                     )}
                   </p>
                 </div>
@@ -2851,7 +3091,7 @@ Let's focus on the first sub-step. You've got this!`
                   onClick={handleStartNewSession}
                   className="w-full mt-1 py-3.5 px-6 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm sm:text-base rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] active:scale-[0.99] uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shrink-0"
                 >
-                  START NEW SESSION
+                  {language === 'es' ? 'INICIAR NUEVA SESIÓN' : 'START NEW SESSION'}
                 </button>
               </motion.div>
             ) : null}

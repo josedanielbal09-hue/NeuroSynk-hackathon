@@ -13,6 +13,36 @@ class AudioService {
   private audioCtx: AudioContext | null = null;
   private lastPlayedMap: Map<FocusState, number> = new Map();
   private muted: boolean = false;
+  private ttsEnabled: boolean = true;
+  private earconsEnabled: boolean = true;
+  private preferredLang: 'es' | 'en' = 'es';
+  private isMicRecordingMutex: boolean = false;
+
+  public setLanguage(lang: 'es' | 'en'): void {
+    this.preferredLang = lang;
+  }
+
+  public getLanguage(): 'es' | 'en' {
+    return this.preferredLang;
+  }
+
+  public setTtsEnabled(enabled: boolean): void {
+    this.ttsEnabled = enabled;
+    if (!enabled) {
+      this.stopSpeaking();
+    }
+  }
+
+  public setEarconsEnabled(enabled: boolean): void {
+    this.earconsEnabled = enabled;
+  }
+
+  public setMicRecordingMutex(active: boolean): void {
+    this.isMicRecordingMutex = active;
+    if (active) {
+      this.stopSpeaking();
+    }
+  }
 
   /**
    * Lazily initializes or retrieves the native Web Audio API AudioContext.
@@ -105,7 +135,7 @@ class AudioService {
    * Plays synthesized state sound ("Earcon") matching FocusBud's state.
    */
   public playStateSound(state: FocusState): void {
-    if (this.muted) return;
+    if (this.muted || !this.earconsEnabled) return;
 
     const config = AVATAR_CONFIG[state]?.audioConfig;
     if (!config) return;
@@ -167,8 +197,9 @@ class AudioService {
   }
 
   /**
-   * Synthesizes empathetic English voice using native Web Speech API.
-   * Adapts rate and pitch automatically to sound warm and human.
+   * Synthesizes empathetic voice using native Web Speech API.
+   * Automatically detects whether `text` is in Spanish or English so the voice
+   * engine NEVER reads English words with a Spanish voice (or vice versa).
    */
   public speak(
     text: string,
@@ -176,11 +207,18 @@ class AudioService {
       rate?: number;
       pitch?: number;
       volume?: number;
+      lang?: 'es' | 'en';
       onStart?: () => void;
       onEnd?: () => void;
     }
   ): void {
-    if (this.muted || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    if (
+      this.muted ||
+      !this.ttsEnabled ||
+      this.isMicRecordingMutex ||
+      typeof window === 'undefined' ||
+      !('speechSynthesis' in window)
+    ) {
       if (options?.onEnd) options.onEnd();
       return;
     }
@@ -189,20 +227,49 @@ class AudioService {
       // Cancel any previous utterance to prevent overlap
       window.speechSynthesis.cancel();
 
-      const utterance = new SpeechSynthesisUtterance(text);
+      const cleanText = String(text || '').trim();
+      if (!cleanText) {
+        if (options?.onEnd) options.onEnd();
+        return;
+      }
+
+      // Detect language of the actual text to prevent reading English with Spanish accent (or vice versa)
+      let targetLang: 'es' | 'en' = options?.lang || this.preferredLang;
+      if (!options?.lang) {
+        const hasSpanishChars = /[áéíóúñ¿¡]/i.test(cleanText);
+        const spanishStopWords = /\b(el|la|los|las|de|del|que|qué|como|cómo|para|con|por|una|uno|este|esta|paso|meta|ahora|respira|enfoque|pausa|bien|excelente)\b/i.test(cleanText);
+        const englishStopWords = /\b(the|and|your|with|for|step|focus|take|breath|zero|pressure|steady|pace|complete|let's|right|now|goal)\b/i.test(cleanText);
+        if (hasSpanishChars || (spanishStopWords && !englishStopWords)) {
+          targetLang = 'es';
+        } else if (englishStopWords && !spanishStopWords) {
+          targetLang = 'en';
+        }
+      }
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       const voices = window.speechSynthesis.getVoices();
 
-      // Find native English voice
-      const englishVoice = voices.find(v =>
-        v.lang.toLowerCase().startsWith('en-us') ||
-        v.lang.toLowerCase().startsWith('en-gb') ||
-        v.lang.toLowerCase().startsWith('en')
-      );
-
-      if (englishVoice) {
-        utterance.voice = englishVoice;
+      if (targetLang === 'es') {
+        const spanishVoice =
+          voices.find(v => v.lang.toLowerCase().startsWith('es-mx') && /natural|neural|google|sabina|dalia|jorge/i.test(v.name)) ||
+          voices.find(v => v.lang.toLowerCase().startsWith('es-mx')) ||
+          voices.find(v => v.lang.toLowerCase().startsWith('es-es')) ||
+          voices.find(v => v.lang.toLowerCase().startsWith('es'));
+        if (spanishVoice) {
+          utterance.voice = spanishVoice;
+        }
+        utterance.lang = spanishVoice ? spanishVoice.lang : 'es-MX';
+      } else {
+        const englishVoice =
+          voices.find(v => v.lang.toLowerCase().startsWith('en-us') && /natural|neural|google|aria|jenny|guy/i.test(v.name)) ||
+          voices.find(v => v.lang.toLowerCase().startsWith('en-us')) ||
+          voices.find(v => v.lang.toLowerCase().startsWith('en-gb')) ||
+          voices.find(v => v.lang.toLowerCase().startsWith('en'));
+        if (englishVoice) {
+          utterance.voice = englishVoice;
+        }
+        utterance.lang = englishVoice ? englishVoice.lang : 'en-US';
       }
-      utterance.lang = englishVoice ? englishVoice.lang : 'en-US';
       utterance.rate = options?.rate ?? 0.98;
       utterance.pitch = options?.pitch ?? 1.05;
       utterance.volume = options?.volume ?? 0.95;
